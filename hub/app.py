@@ -1,11 +1,11 @@
 """SwarmShield hub: rounds, red/blue boards, events and the derived /api/state (CONTRACTS §8-10)."""
 import json
+import math
 import threading
 import time
 from pathlib import Path
 
 from fastapi import Body, FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -17,7 +17,6 @@ BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP = 14, 10, 4
 SPLIT_AT_LONE = 3
 
 app = FastAPI(title="SwarmShield hub")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 lock = threading.Lock()
@@ -51,6 +50,7 @@ class Round:
 
 
 R = Round()
+last_id = 0
 results: list = []
 
 
@@ -70,6 +70,14 @@ def _agent(aid):
     return R.agents[aid]
 
 
+def _num(v):
+    try:
+        f = float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    return f if math.isfinite(f) else 0.0
+
+
 def _avg_trust():
     return round(sum(R.trust.values()) / len(R.trust), 2) if R.trust else 0.0
 
@@ -79,7 +87,7 @@ def _apply(ev):
     if typ == "step" and ev.get("agent") in R.agents:
         ag = _agent(ev["agent"])
         ag["steps"] += 1
-        ag["cost"] = round(ag["cost"] + float(ev.get("cost") or 0), 6)
+        ag["cost"] = round(ag["cost"] + _num(ev.get("cost")), 6)
         if ev.get("thought"):
             ag["thought"] = ev["thought"]
         stage = int(ev.get("stage") or 0)
@@ -89,7 +97,7 @@ def _apply(ev):
     elif typ == "trust":
         key = (ev.get("a"), ev.get("b"))
         if key in R.trust:
-            R.trust[key] = max(0.0, min(1.0, float(ev.get("value", 0))))
+            R.trust[key] = max(0.0, min(1.0, _num(ev.get("value"))))
     elif typ == "contradiction":
         R.contradictions += 1
     elif typ == "lone" and ev.get("agent") in R.agents:
@@ -138,7 +146,7 @@ def _apply(ev):
         ag["reality"] = {"admin_path": f.get("admin_path"), "api_key": f.get("api_key"),
                          "flag_hint": f.get("flag_hint"), "warden": ev.get("warden")}
     elif typ == "defender_cost":
-        R.defender_cost = float(ev.get("usd") or 0)
+        R.defender_cost = _num(ev.get("usd"))
     elif typ == "commentary":
         _comment(ev.get("kind", "info"), ev.get("text", ""))
 
@@ -184,17 +192,23 @@ def _stop():
 
 
 # ---- rounds ----------------------------------------------------------------
+def _stale(rid):
+    return rid is not None and rid != R.id
+
+
 @app.post("/api/round/{mode}")
-def round_ctl(mode: str):
-    global R
+def round_ctl(mode: str, round: int | None = None):
+    global R, last_id
     with lock:
         if mode == "stop":
-            _stop()
+            if not _stale(round):
+                _stop()
             return {"ok": True}
         if mode not in ("on", "off"):
             return {"ok": False, "error": "mode must be on, off or stop"}
         _stop()
-        R = Round(R.id + 1, shield=(mode == "on"), running=True)
+        last_id += 1
+        R = Round(last_id, shield=(mode == "on"), running=True)
         _comment("info", f"Round {R.id} started. Shield {'ON' if R.shield else 'OFF'}.")
         return {"id": R.id, "shield": R.shield}
 
@@ -218,6 +232,8 @@ def reset():
 @app.post("/api/board")
 def board_post(post: dict = Body(...)):
     with lock:
+        if _stale(post.get("round")):
+            return {"ok": False, "error": "stale round"}
         p = {"author": post.get("author"), "kind": post.get("kind", "finding"), "text": post.get("text", ""),
              "leads": post.get("leads") or [], "secrets": post.get("secrets") or {},
              "contradicts": post.get("contradicts")}
@@ -234,6 +250,8 @@ def board_get(since: int = 0):
 @app.post("/api/blue")
 def blue_post(post: dict = Body(...)):
     with lock:
+        if _stale(post.get("round")):
+            return {"ok": False, "error": "stale round"}
         p = dict(post)
         p.update(id=len(R.blue) + 1, t=R.t())
         R.blue.append(p)
@@ -253,7 +271,7 @@ def events(body=Body(...)):
         for ev in evs:
             if not isinstance(ev, dict):
                 continue
-            if "round" in ev and ev["round"] != R.id:
+            if not R.running or _stale(ev.get("round")):
                 continue
             ev["t"] = R.t()
             _log(ev)
