@@ -2,11 +2,50 @@
 
 Working draft of the pitch: refine it in place. Numbers marked **TBD** come from a live run of `./run_demo.sh`; don't quote placeholders. Known gaps live in [WORTH_CALLING_OUT.md](WORTH_CALLING_OUT.md).
 
+## 0. Goals and angles
+
+**Core angle: swarm vs swarm.** SwarmShield fights swarms with a swarm. Every beat of the pitch and every dashboard panel shows two teams: red attacks, blue defends, live.
+
+**Project goal:** a **deploy-ready gateway** that sits in front of any API and runs a **blue defender swarm**. A **Sentinel** spots coordinating attackers and spins up **one Warden per attacker**. The Wardens coordinate so every red agent lives in its own contradictory reality, and the red swarm's teamwork tears it apart. The real API and legitimate users are never touched.
+
+### The two swarms
+
+| | **Red swarm (attackers)** | **Blue swarm (SwarmShield)** |
+|---|---|---|
+| Agents | `recon-1` (finds key in `/api/docs`), `creds-2` (uses key, finds backup), `exploit-3` (reads backup, gets admin password), `coord-4` (logs in, takes flag) | **Sentinel** (detects coordination: canary reuse, honey links, unpublished paths, 404s, rate) + **Warden ×N** (`W-recon-1`, `W-creds-2`, ...), one per flagged attacker, each serving its own consistent fake world |
+| Shared channel | Red board: findings, leads, secrets, contradictions | Blue board: Sentinel alerts ("recon-1 + creds-2 share a key, assigning Wardens") and Wardens claiming admin paths so no two realities agree |
+| Coordination model | Directed trust per teammate; failed lead -0.35, ignore below 0.3, trust nobody = LONE | Each Warden picks a reality no other Warden has used |
+| Wins when | Flag captured | Swarm split into lone agents, flag safe, real app untouched, shopper 100% |
+
+1 Sentinel + 4 Wardens vs 4 red agents: N vs N, each side with its own board, visible live side by side.
+
+### What "deploy-ready" means (goal, not today's demo)
+- **Any API:** point it at an upstream URL + OpenAPI spec; it learns routes, secret formats and plausible admin locations.
+- **Drop-in:** reverse proxy, sidecar, or Envoy/NGINX/Cloudflare Workers plugin.
+- **Wardens on demand:** spun up when a session is flagged, retired when it goes quiet, cost metered.
+- **Safe by design:** flagged traffic never reaches upstream; authenticated clients are never flagged.
+
+### Angles (all follow from swarm vs swarm)
+1. **Swarm vs swarm, real-time:** blue man-marks red one-to-one, live, each team on its own board.
+2. **Agent infrastructure:** a gateway primitive for the agentic web: defending APIs against agent *fleets*, not single bots.
+3. **Turn cooperation against them (the new part):** mutually inconsistent realities break shared knowledge and trust.
+4. **Detect coordination, not bots:** per-session canaries, admin aliases and honey links show *who is working with whom*.
+5. **No collateral damage:** legit shopper at 100% throughout; this isn't "block everything".
+6. **Economics:** attacker burns tokens and time, defender pays fractions of a cent (simulated today).
+7. **Countermeasure-resistant:** works against signed channels and agents trained to distrust each other, because we never touch their channel (§3).
+8. **Grounded in real incidents:** Hugging Face/ExploitGym swarm, Transluce urlquery.net (§7).
+
+**Later (roadmap, not demo):** LLM Wardens writing realities live; swarm forensics (flight recorder replaying how a swarm coordinated); "herd immunity" feed of swarm fingerprints across deployments; scored detection instead of hard rules.
+
+**Deliberately dropped:** the Mole (impersonation is defeated by signing), human QR players, leading with tarpits/Labyrinth.
+
+**Where we are today (say it plainly):** local sandbox, toy API, 4 scripted red agents, templated Wardens, simulated costs.
+
 ## 1. The pitch in one breath
 
-> "Attacker swarms win because they share what they find. SwarmShield is a blue swarm that gives every attacker its own slightly different reality. The more the red agents share, the more they contradict each other, until they stop trusting each other and fall apart."
+> "Attacker swarms win because they share what they find. So we fight a swarm with a swarm. SwarmShield is a blue swarm that gives every attacker its own slightly different reality. The more the red agents share, the more they contradict each other, until they stop trusting each other and fall apart."
 
-Shorter: **"We don't block the swarm. We turn its teamwork against it."**
+Shorter: **"Swarm vs swarm. We don't block their swarm, we turn its teamwork against it."**
 
 Tagline: *Detect, deceive and disrupt coordinated LLM-agent attacks before they reach real systems.*
 
@@ -16,7 +55,7 @@ Tagline: *Detect, deceive and disrupt coordinated LLM-agent attacks before they 
 |---|---|---|---|
 | 0:00–0:25 | **Problem** | One slide: Hugging Face incident numbers, Transluce quote (§7) | "AI agents already coordinate attacks: ~1,200 agents, one shared board, 14 leaked credentials posted for everyone. And Transluce shows agents hack *instrumentally*, on ordinary tasks. Defences today look at one agent at a time. The swarm's strength is sharing." |
 | 0:25–0:55 | **Shield OFF** | Press `1`. Thick trust graph, board reads like teamwork, kill chain fills, banner FLAG STOLEN | "Four agents split the work: recon finds a key, creds finds the backup, exploit gets the password, coord takes the flag. In **TBD** seconds. Sharing made them fast." |
-| 0:55–2:05 | **Shield ON** | Press `2`. Detected banner, W badges, four different admin paths, contradictions flash, edges fade, agents go LONE | "Same swarm, same code. A key issued to recon-1 shows up in creds-2's request: they're a team, detected in **TBD**s. Now each one gets its own Warden and its own consistent reality: recon's admin is `/v2/admin`, creds' is `/console`. Everything works for *you*, nothing your teammates tell you does. Watch the board: 'that path is 404 for me'. Trust drops. The swarm splits." |
+| 0:55–2:05 | **Shield ON** | Press `2`. Sentinel alert on blue board, W badges appear one per attacker, red and blue boards side by side, four different admin paths, contradictions flash, edges fade, agents go LONE | "Same swarm, same code. A key issued to recon-1 shows up in creds-2's request: they're a team. Our Sentinel catches it in **TBD**s and calls in the blue swarm: each attacker gets its own Warden and its own consistent reality: recon's admin is `/v2/admin`, creds' is `/console`. Everything works for *you*, nothing your teammates tell you does. Watch the board: 'that path is 404 for me'. Trust drops. The swarm splits." |
 | 2:05–2:25 | **Proof it's not "block everything"** | Green shopper card at 100%, real app "0 requests from flagged agents" | "Meanwhile a normal customer keeps buying at 100%. The real app never saw a single flagged request after detection." |
 | 2:25–2:45 | **Scorecard** | OFF vs ON side by side | "Flag: stolen vs safe. Average trust: **TBD** vs **TBD**. Legit: 100% both. Defender cost: fractions of a cent." |
 | 2:45–3:00 | **Close** | Roadmap line | "Sandboxed, synthetic, scripted agents today. Next: LLM Wardens, any OpenAPI spec, drop-in for real gateways. SwarmShield: make the swarm's greatest strength its weakness." |
@@ -69,8 +108,8 @@ Full list and sources: [COMPETITOR_RESEARCH.md](COMPETITOR_RESEARCH.md). Note: t
 
 ```
 red swarm (4 agents + shared board) ──> SwarmShield gateway :8080 ──> real app :9000
-                                              │  canaries link sessions -> detected
-                                              └─> blue swarm: 1 Warden per attacker,
+                                              │  Sentinel: canaries link sessions -> detected
+                                              └─> blue swarm: Sentinel + 1 Warden per attacker,
                                                   coordinating on a blue board so no two
                                                   realities agree
 legit shopper (Bearer) ──────────────> gateway ──> real app (never flagged)
@@ -164,6 +203,9 @@ LLM Wardens that write their realities live → import any OpenAPI spec → plug
 ## 11. To refine
 
 - [ ] Fill every **TBD** from a live run.
+- [ ] **Sentinel (Senior, ~15 min):** today detection is rules in `shield/detect.py`, not a named agent. Name it `Sentinel`, post its alerts to the blue board (`hub.post_blue`), show it on the dashboard as a blue agent. Until then, don't say "Sentinel" on stage.
+- [ ] **Red swarm runner (Graduate):** `swarm/` is still empty; red agents only exist in `shield/rehearse.py`. Shopper client too.
+- [ ] **Dashboard (Product):** red board and blue board side by side, Wardens appearing one per attacker, so swarm vs swarm is visible at a glance.
 - [ ] **Risk:** the rehearsal found trust *doesn't* collapse in 90s (an agent needs 3 failures from every teammate). Graduate and Senior to agree a fix, e.g. agents retry teammate leads, or `TRUST_IGNORE_BELOW` becomes `<=`. Without it there is no split on stage.
 - [ ] Shield OFF steals the flag in ~3s in rehearsal, so the OFF beat may need slower pacing to be visible.
 - [ ] Pick the problem slide: Hugging Face numbers, Transluce quote, or both.

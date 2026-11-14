@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `docs`: `docs/PRESENTATION_MATERIAL.md` §0 goals and angles: swarm vs swarm as the core angle, red vs blue agent table, Sentinel added to the blue swarm (to-refine task for Senior), deploy-ready gateway goal (Devin)
 - 2026-11-14 `docs`: `docs/PRESENTATION_MATERIAL.md` pitch draft: one-liner, 3-min script, novelty claim, countermeasures, prior art, metrics, Q&A, caveats, to-refine list (Devin)
 - 2026-11-14 `docs`: `docs/PRESENTATION_MATERIAL.md`, problem-statement sources for the slides (Transluce agent-activity report: facts, quotes, caveats, mapping to SwarmShield) (Senior)
 - 2026-11-14 `shield`: `run_demo.sh` (hub, target, gateway, swarm; stand-in `shield/stubhub.py` until `hub/app.py` lands; logs in `logs/`), `python -m shield.rehearse` scripted swarm reports detect time/real hits/shopper/trust for OFF and ON (Senior)
