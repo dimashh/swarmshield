@@ -88,8 +88,14 @@ Presenter controls: `1` Shield OFF, `2` Shield ON, `E` end round. Run **one full
 | Decoy APIs / tarpits for AI | trappsec, Cloudflare AI Labyrinth, Nepenthes | Not our pitch; our Wardens are realities, not mazes |
 | Deceiving LLM agents | Mantis, Cloak-Honey-Trap (USENIX '25), Beelzebub | Single-agent; we go swarm-level |
 | Detecting collusion | GroupGuard | Detects; doesn't turn the collusion against itself |
+| Unique consistent persona per honeypot | Sundew | **Closest to Wardens.** Per deployment, not per attacker in one swarm, not coordinated to contradict |
+| "Contradictory environment" for AI agents | DaxxSec/Labyrinth (MINOTAUR layer) | **Closest wording.** Contradictions inside one agent's maze, not between teammates |
+| Multi-agent defensive honeypots | AdvancedShelLM, HydraPoT | Blue-side teams exist; none coordinate across attackers |
+| Can a swarm's trust be attacked? | *Offers, Not Rumours* (Apart, Nov 2026): rumours/forged accusations did **not** turn LLM swarm agents | Supports dropping the Mole: we send no rumours, agents see teammate leads fail first-hand. Risk: our trust collapse is scripted, untested on LLM agents |
 
-Full list and sources: [COMPETITOR_RESEARCH.md](COMPETITOR_RESEARCH.md). Note: that doc was written for the earlier Mole design; §3 above supersedes its "lead with the Mole" advice.
+**Say:** "Deception for single agents is crowded: Tracebit, Armada, Sundew, Labyrinth. We use it at the swarm level: one blue agent per red agent, coordinating so their realities contradict."
+
+Full list and sources: [COMPETITOR_RESEARCH.md](COMPETITOR_RESEARCH.md) §15 (Split-Brain update). Sections 1–13 of that doc assess the earlier Mole design.
 
 ## 5. Metrics to show (swarm-level, not just "tokens burned")
 
@@ -203,7 +209,7 @@ LLM Wardens that write their realities live → import any OpenAPI spec → plug
 ## 11. To refine
 
 - [ ] Fill every **TBD** from a live run.
-- [ ] **Sentinel (Senior, ~15 min):** today detection is rules in `shield/detect.py`, not a named agent. Name it `Sentinel`, post its alerts to the blue board (`hub.post_blue`), show it on the dashboard as a blue agent. Until then, don't say "Sentinel" on stage.
+- [x] **Sentinel:** `shield/sentinel.py` now posts its alerts to the blue board (commit c102bc0). Dashboard still needs to show it as a blue agent.
 - [ ] **Red swarm runner (Graduate):** `swarm/` is still empty; red agents only exist in `shield/rehearse.py`. Shopper client too.
 - [ ] **Dashboard (Product):** red board and blue board side by side, Wardens appearing one per attacker, so swarm vs swarm is visible at a glance.
 - [ ] **Risk:** the rehearsal found trust *doesn't* collapse in 90s (an agent needs 3 failures from every teammate). Graduate and Senior to agree a fix, e.g. agents retry teammate leads, or `TRUST_IGNORE_BELOW` becomes `<=`. Without it there is no split on stage.

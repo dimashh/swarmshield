@@ -2,6 +2,8 @@
 
 *Hackathon project research, 14 November 2026*
 
+> **Update:** sections 1–13 assess the earlier Mole design. The current design is Split-Brain; see [section 15](#15-split-brain-update) first.
+
 ## Contents
 
 1. [Summary](#1-summary)
@@ -18,6 +20,7 @@
 12. [Implications for the build and the pitch](#12-implications-for-the-build-and-the-pitch)
 13. [How the build plan maps to this research](#13-how-the-build-plan-maps-to-this-research)
 14. [Sources](#14-sources)
+15. [Split-Brain update](#15-split-brain-update)
 
 ## 1. Summary
 
@@ -318,3 +321,57 @@ Prior art for the plan's detection method (per-session canary tokens replayed ac
 [spec]: https://swarm-ai-research.github.io/wiki-agent-swarm-incident/analysis/swarm-detection-spec.html
 [iocs]: https://itnext.io/catching-ai-red-teamers-in-the-wild-using-reverse-prompt-injection-as-a-honeypot-detection-36e2f3327611
 [webagents]: https://arxiv.org/abs/2606.30119
+
+## 15. Split-Brain update
+
+*Re-check, 14 November 2026, afternoon. Method: arXiv API, GitHub repository search and vendor pages fetched directly. No general web search engine was available, so commercial coverage is thinner than in sections 5–9.*
+
+### 15.1 The design being assessed
+
+The Mole is dropped. SwarmShield is now **swarm vs swarm**: a gateway in front of any API runs a blue swarm made of a **Sentinel** (detects coordination: canary reuse, honey links, unpublished paths, 404s, rate) and **one Warden per flagged attacker**. Each Warden serves its attacker a consistent fake world. The Wardens coordinate on a blue board so that no two realities agree. Teammate leads then fail, red trust drops and the swarm splits into lone agents. The real API and the legitimate client are untouched.
+
+### 15.2 How each piece compares
+
+| Our piece | Closest existing work | Verdict |
+|---|---|---|
+| Gateway in front of any API | API gateways, bot management (Cloudflare and others) | Table stakes |
+| Coordination detection via canaries | Canarytokens, Tracebit, [snare][snare] (honey credentials for agents); [Counter-Swarm Doctrine][csd] (framing, no detector) | Known building block |
+| Fake worlds for AI attackers | [Tracebit][tracebit], [Armada][armada] ("decoys identify how an attacking agent behaves and change their responses to match, feeding it calibrated disinformation"), Mantis, CHeaT, Cloudflare AI Labyrinth | Crowded |
+| A unique consistent identity per instance | [Sundew][sundew]: persona engine gives every *deployment* a unique identity, so "an agent that has seen one Sundew deployment gains zero advantage against any other" | **Closest to Wardens.** Per deployment, not per attacker inside one swarm, and not coordinated to contradict |
+| Contradictory environment | [DaxxSec/Labyrinth][daxx]: layer MINOTAUR, "agent explores contradictory environment"; also aims to "commandeer" agents | **Closest wording.** Contradictions inside one agent's maze, not between teammates |
+| A defensive team of agents | [AdvancedShelLM][asl] and [HydraPoT][hydra] (multi-agent LLM honeypots), GroupGuard, GhostShell-style projects | Multi-agent blue side is not new on its own |
+| **Blue agents man-marking red agents 1:1, coordinating so the red swarm's realities contradict and its trust collapses** | Not found | **The claim** |
+
+### 15.3 New evidence on swarm trust
+
+[*Offers, Not Rumours: What Turns Agents in an LLM Swarm*][onr] (Apart Research Swarm Alignment Hackathon, November 2026) ran cooperative LLM swarm games with forged messages. Messages that promised the receiver something (bribes, forged offers) turned agents. **Messages about other agents (rumours, forged accusations) did not.** A forger in a 10-agent swarm harmed welfare only when it forged every round, and one resilience instruction removed bought defections.
+
+- **Supports the pivot:** a Mole posting accusations is the kind of message that did not work. Split-Brain sends no messages about teammates; each agent directly experiences a teammate's lead failing.
+- **Risk:** LLM swarms can be robust to trust attacks. Our trust collapse is scripted. Whether real LLM agents downgrade a teammate after first-hand failures is untested and should be said in Q&A.
+
+### 15.4 Updated positioning map
+
+| Capability | Tracebit | Armada | Sundew | DaxxSec Labyrinth | Multi-agent honeypots | SwarmShield |
+|---|---|---|---|---|---|---|
+| Deceives AI attackers | Yes | Yes | Yes | Yes | Yes | Yes |
+| Consistent per-target fake world | Not stated | Adaptive per agent | Per deployment | Per session maze | Per session | Per attacker (Warden) |
+| Detects coordination between attackers | Not found | Not found | Not found | Not found | Not found | Yes (Sentinel) |
+| Defender agents coordinate across attackers | No | Not found | No | Not found | Within one session | **Yes (blue board)** |
+| Realities deliberately contradict across teammates | No | Not found | No | No | No | **Yes** |
+| Swarm-level metrics (trust, time to split) | No | Not found | No | No | No | **Yes** |
+
+"Not found" means not mentioned in the material reviewed.
+
+### 15.5 Implications for the pitch
+
+- Say: "Deception for single agents is crowded: Tracebit, Armada, Sundew, Labyrinth. We use it at the swarm level: one blue agent per red agent, coordinating so their realities contradict. We haven't found anyone breaking an attacker swarm's trust this way."
+- Name Sundew and DaxxSec/Labyrinth before judges do; both are open source and easy to find.
+- Lead with the three defensible edges: N-vs-N marking, cross-attacker contradiction via the blue board, swarm-level metrics.
+- Own the *Offers, Not Rumours* risk: scripted trust today; testing with LLM red agents is the first roadmap item.
+
+[sundew]: https://github.com/sundew-sh/sundew
+[daxx]: https://github.com/DaxxSec/Labyrinth
+[snare]: https://github.com/peg/snare
+[asl]: https://arxiv.org/abs/2606.27990
+[hydra]: https://arxiv.org/abs/2610.27722
+[onr]: https://github.com/irajmoradi/offers-not-rumours
