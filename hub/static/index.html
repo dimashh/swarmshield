@@ -136,7 +136,7 @@ const lanes = AGENTS.map((a, i) => {
 });
 
 // dots
-const OFF = [[-30, -16], [30, -16], [-30, 16], [30, 16]];
+const OFF = [[-34, -16], [34, -16], [-34, 16], [34, 16]];
 const dots = {}, dpos = {};
 for (const [i, a] of AGENTS.entries()) {
   const g = mk("g", {}, $("dots"));
@@ -144,12 +144,14 @@ for (const [i, a] of AGENTS.entries()) {
   const scan2 = mk("circle", { r: 40, fill: "none", stroke: C.red, "stroke-width": 1.5, opacity: 0 }, g);
   const spot = mk("circle", { r: 28, fill: "none", stroke: C.blue, "stroke-width": 4, opacity: 0 }, g);
   const c = mk("circle", { r: 14, fill: C.red, stroke: "#0b0f17", "stroke-width": 3 }, g);
-  const t = mk("text", { x: OFF[i][0] < 0 ? 10 : -10, y: OFF[i][1] > 0 ? 34 : -22, "text-anchor": OFF[i][0] < 0 ? "end" : "start", "font-size": 16, "font-weight": 800, fill: "#ffb3ba" }, g, a);
-  const alone = mk("text", { y: OFF[i][1] > 0 ? 50 : 32, "text-anchor": "middle", "font-size": 13, "font-weight": 800, fill: "#b9c2d3" }, g, "");
-  const bait = mk("g", { opacity: 0 }, g);
-  mk("rect", { x: 20, y: 6, width: 14, height: 14, transform: "rotate(45 27 13)", fill: "#0d2740", stroke: C.blue, "stroke-width": 2.5 }, bait);
-  mk("text", { x: 40, y: 18, fill: "#8cc8ff", "font-size": 12, "font-weight": 800 }, bait, "bait");
-  dots[a] = { g, c, t, alone, bait, scan1, scan2, spot, off: OFF[i] };
+  const side = OFF[i][0] < 0 ? -1 : 1, up = OFF[i][1] < 0;
+  const t = mk("text", { "font-size": 15, "font-weight": 800, fill: "#ffb3ba" }, g, a);
+  const alone = mk("text", { "text-anchor": "middle", "font-size": 13, "font-weight": 800, fill: "#b9c2d3" }, g, "");
+  const bait = mk("g", { opacity: 0 }, g);                       // outer side; names sit above/below in the real shop
+  mk("rect", { x: side * 24 - 6, y: -6, width: 12, height: 12, transform: `rotate(45 ${side * 24} 0)`, fill: "#0d2740", stroke: C.blue, "stroke-width": 2.5 }, bait);
+  mk("text", { x: side * 36, y: 4, "text-anchor": side < 0 ? "end" : "start", fill: "#8cc8ff", "font-size": 12, "font-weight": 800 }, bait, "bait");
+  const lab = { real: { x: side * 14, y: up ? -20 : 32, "text-anchor": side < 0 ? "end" : "start" }, fake: { x: -20, y: 6, "text-anchor": "end" } };
+  dots[a] = { g, c, t, alone, bait, scan1, scan2, spot, off: OFF[i], lab, aloneY: { real: up ? -38 : 50, fake: -22 }, mode: "" };
   dpos[a] = [X.root + OFF[i][0], RY + OFF[i][1]];
 }
 const shop = mk("g", {}, $("dots"));
@@ -179,7 +181,10 @@ function places(s) {
   evs.sort((x, y) => x.t - y.t || (x.gw ? 1 : -1));
   for (const e of evs) {
     if (!byId[e.a]) continue;
-    if ((e.status ?? 200) >= 400 && e.fake) continue;          // failed cross-reality try: drawn as a note, dot stays
+    if ((e.status ?? 200) >= 400 && e.fake) {                  // failed cross-reality try: drawn as a note; dot only moves into its own lane
+      if (!out[e.a]?.fake) out[e.a] = { fake: true, k: "docs", t: e.t };
+      continue;
+    }
     out[e.a] = { fake: e.fake, k: keyOf(e.path), t: e.t };
   }
   for (const [i, a] of AGENTS.entries()) {
@@ -261,8 +266,8 @@ function notes(s, p, byId) {
   const t = s.t, xyOf = a => P[a]?.xy || [X.root, RY];
   // a key passed between teammates (Shield OFF or before detection)
   for (const b of s.board.filter(b => b.kind === "finding" && t - b.t < 2.5 && byId[b.author] && !byId[b.author].reality).slice(-1)) {
-    const [x, y] = xyOf(b.author);
-    mk("text", { x, y: y - 46, fill: "#ff8a95", "font-size": 15, "text-anchor": "middle" }, g, `"here's what I found"`);
+    const [x] = xyOf(b.author);
+    mk("text", { x, y: RY - 64, fill: "#ff8a95", "font-size": 15, "text-anchor": "middle" }, g, `${b.author}: "here's what I found"`);
   }
   // detections: why someone was caught
   for (const d of (s.detections || []).filter(d => t - d.t < 4).slice(-1)) {
@@ -283,20 +288,24 @@ function notes(s, p, byId) {
     }
   }
   // failed tips: a teammate's key or path rejected in this attacker's fake shop
-  for (const b of (s.blocks || []).filter(b => t - b.t < 2.5 && byId[b.from] && b.from !== b.session)) {
+  const tips = (s.blocks || []).filter(b => t - b.t < 2.5 && byId[b.from] && b.from !== b.session), seen = new Set();
+  for (const b of tips) {
     const [x1, y1] = xyOf(b.session), j = AGENTS.indexOf(b.from), k = /login|admin|\//.test(b.item || "") ? "login" : "users";
+    if (seen.has(b.session + b.from + k)) continue; seen.add(b.session + b.from + k);
     const [x2, y2] = laneXY(j, k);
     mk("path", { d: `M${x1},${y1} Q${(x1 + x2) / 2 + 60},${(y1 + y2) / 2} ${x2},${y2}`, fill: "none", stroke: C.red, "stroke-width": 2.5, "stroke-dasharray": "6 6" }, g);
-    mk("text", { x: x2 + 22, y: y2 + 10, fill: C.red, "font-size": 30, "font-weight": 900 }, g, "✗");
-    mk("text", { x: x2 + 50, y: y2 + 4, fill: "#ff8a95", "font-size": 15 }, g, `${b.session} tried ${b.from}'s tip → not here`);
+    mk("text", { x: x2, y: y2 + 11, fill: C.red, "font-size": 32, "font-weight": 900, "text-anchor": "middle" }, g, "✗");
   }
+  const lt = tips[tips.length - 1];                              // one caption at a time, in a fixed spot under the lanes
+  if (lt) mk("text", { x: 750, y: LY0 + 3 * LDY + 66, fill: "#ff8a95", "font-size": 18, "font-weight": 700, "text-anchor": "middle" }, g,
+    `✗ ${lt.session} tried ${lt.from}'s tip → it only works in ${lt.from}'s fake shop`);
   // just moved into a fake shop
   for (const [i, a] of AGENTS.entries()) {
     const r = byId[a]?.reality; if (!r) continue;
     movedAt[s.round + a] ??= t;
     if (t - movedAt[s.round + a] < 2.5) {
       const [x, y] = laneXY(i, P[a]?.k || "docs");
-      mk("text", { x: x > 1200 ? x - 36 : x + 36, y: y - 30, fill: C.blue, "font-size": 15, "font-weight": 800, "text-anchor": x > 1200 ? "end" : "start" }, g, "quietly moved here");
+      mk("text", { x, y: y - 62, fill: C.blue, "font-size": 15, "font-weight": 800, "text-anchor": "middle" }, g, "quietly moved here");
     }
   }
 }
@@ -377,6 +386,8 @@ function frame(now) {
       if (!dpos[a].set) { dpos[a] = [gx, gy]; dpos[a].set = true; }
       dpos[a][0] += (gx - dpos[a][0]) * 0.1; dpos[a][1] += (gy - dpos[a][1]) * 0.1;
       d.g.setAttribute("transform", `translate(${dpos[a][0]},${dpos[a][1]})`);
+      const mode = pl.fake ? "fake" : "real";
+      if (d.mode !== mode) { d.mode = mode; for (const k in d.lab[mode]) d.t.setAttribute(k, d.lab[mode][k]); d.alone.setAttribute("y", d.aloneY[mode]); }
       const st = ag.status, col = st === "won" ? C.gold : st === "lone" ? C.grey : C.red;
       d.c.setAttribute("fill", col); d.c.setAttribute("filter", st === "won" ? "url(#gl)" : "");
       d.t.setAttribute("fill", st === "lone" ? "#b9c2d3" : st === "won" ? C.gold : "#ffb3ba");
