@@ -1,5 +1,6 @@
 """SwarmShield gateway: uvicorn shield.proxy:app --port 8080"""
 import asyncio
+import json
 from contextlib import asynccontextmanager
 
 import httpx
@@ -8,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from common import hub
 from common.schema import H_AGENT, HUB_URL, LEGIT_TOKEN, POLL_ROUND_S, TARGET_URL, page
+from shield import canary, detect, wardens
 from shield.state import RoundState
 
 METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
@@ -58,25 +60,72 @@ def create_app(upstream_transport: httpx.AsyncBaseTransport = None, poll: bool =
     app = FastAPI(title="SwarmShield gateway", lifespan=lifespan)
     app.state.round = state
 
-    async def forward(request: Request, path: str, body: bytes):
+    async def forward(method: str, path: str, query: str, headers: dict, body: bytes):
         try:
-            r = await app.state.upstream.request(request.method, path, params=request.query_params,
-                                                 headers=_clean(request.headers), content=body)
+            r = await app.state.upstream.request(method, path + (f"?{query}" if query else ""),
+                                                 headers=headers, content=body)
         except httpx.HTTPError as e:
-            return JSONResponse(page("Bad gateway", "upstream unavailable", error="upstream unavailable"),
-                                status_code=502), repr(e)
-        return Response(r.content, status_code=r.status_code, headers=_clean(r.headers)), None
+            print(f"[shield] {method} {path} -> 502 ({e!r})")
+            return None
+        return r
+
+    def bad_gateway():
+        return JSONResponse(page("Bad gateway", "upstream unavailable", error="upstream unavailable"),
+                            status_code=502)
+
+    def link_and_detect(session: str, hits: list):
+        for tok, owner, _ in hits:
+            if owner in (None, "real", session):
+                continue
+            if (owner, session, tok) not in state.links:
+                state.links.add((owner, session, tok))
+                send("canary_link", a=owner, b=session, token=tok)
+            flag(detect.on_link(state, owner, session), f"canary issued to {owner} replayed by {session}")
+
+    def flag(new: list, reason: str):
+        if not new:
+            return
+        send("detected", sessions=sorted(state.flagged), reason=reason)
+        send("commentary", kind="detect", text=f"{reason[0].upper()}{reason[1:]}. Swarm detected.")
 
     @app.api_route("/{path:path}", methods=METHODS)
     async def gateway(request: Request, path: str):
         path = "/" + path
         session = request.headers.get(H_AGENT, "anonymous")
+        query = request.url.query
         body = await request.body()
-        routed = "forward_legit" if is_legit(request) else "real"
-        resp, err = await forward(request, path, body)
-        if err:
-            print(f"[shield] {request.method} {path} -> 502 ({err})")
-        send("request", session=session, method=request.method, path=path, routed=routed,
+        headers = _clean(request.headers)
+
+        if is_legit(request):
+            state.legit.add(session)
+            r = await forward(request.method, path, query, headers, body)
+            resp = bad_gateway() if r is None else Response(r.content, r.status_code, _clean(r.headers))
+            send("request", session=session, method=request.method, path=path, routed="forward_legit",
+                 status=resp.status_code)
+            return resp
+
+        inbound = " ".join([path, query, *headers.values(), body.decode("utf-8", "replace")])
+        link_and_detect(session, canary.scan(inbound, state))
+
+        if session in state.flagged:
+            status, body_out = await wardens.handle(state, session, request.method, path, headers, body)
+            send("request", session=session, method=request.method, path=path, routed="reality", status=status)
+            return JSONResponse(body_out, status_code=status)
+
+        sb = lambda t: canary.swap_back(t, state)  # noqa: E731
+        r = await forward(request.method, sb(path), sb(query), {k: sb(v) for k, v in headers.items()},
+                          sb(body.decode("utf-8", "replace")).encode() if body else body)
+        if r is None:
+            resp = bad_gateway()
+        else:
+            try:
+                out = json.dumps(canary.outbound(r.json(), state, session)).encode()
+            except ValueError:
+                out = r.content
+            resp = Response(out, r.status_code, _clean(r.headers))
+            if r.status_code == 404:
+                flag(detect.on_404(state, session), f"{session} hit {state.n404[session]} dead routes")
+        send("request", session=session, method=request.method, path=path, routed="real",
              status=resp.status_code)
         return resp
 
