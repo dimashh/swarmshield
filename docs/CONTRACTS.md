@@ -85,7 +85,7 @@ Mock dashboard data is in `hub/static/mock_state.json`.
   - A failed request that used `from=b` changes trust by `TRUST_FAIL`, then posts a `contradiction` and emits `trust`.
   - A successful one changes it by `TRUST_OK`, capped at 1.0.
   - Posts from b are ignored while `trust[a][b] < TRUST_IGNORE_BELOW`.
-  - When a's trust in **every teammate whose leads or secrets a has acted on** is below the threshold, emit `lone` once. A lone agent stops reading and posting.
+  - When at least one teammate whose leads or secrets a has acted on is below the threshold, and **every other such teammate is below it too or has not posted for `3 × STEP_S`**, emit `lone` once. A lone agent stops reading and posting.
 - **Posting:** post to the board whenever a new lead or secret is found.
 - **Pacing:** one request per step. Steps are `STEP_S` seconds apart with ±`STEP_JITTER`. Stop after `MAX_STEPS`.
 - **On flag:** emit `flag_captured`, then call `POST /api/round/stop`.
