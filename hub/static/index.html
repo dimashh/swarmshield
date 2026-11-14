@@ -192,6 +192,7 @@ function places(s) {
     if (!ag) continue;
     if (ag.status === "won") out[a] = { fake: false, k: "flag" };
     if (!out[a]) out[a] = ag.reality ? { fake: true, k: "docs" } : { fake: false, k: CHAIN[Math.min(5, ag.stage || 0)] };
+    if (ag.reality && !out[a].fake && ag.status !== "won") out[a] = { fake: true, k: "docs" };  // gateway only routes it to its fake shop now
     if (out[a].fake && !ag.reality && !ag.stage_fake) out[a].fake = false;
     if (out[a].fake && !LANE.includes(out[a].k)) out[a].k = "docs";
     out[a].xy = out[a].fake ? laneXY(i, out[a].k) : realXY(out[a].k);
@@ -305,7 +306,7 @@ function notes(s, p, byId) {
     movedAt[s.round + a] ??= t;
     if (t - movedAt[s.round + a] < 2.5) {
       const [x, y] = laneXY(i, P[a]?.k || "docs");
-      mk("text", { x, y: y - 62, fill: C.blue, "font-size": 15, "font-weight": 800, "text-anchor": "middle" }, g, "quietly moved here");
+      mk("text", { x: x > 1200 ? x : x + 28, y: x > 1200 ? y - 62 : y - 18, fill: C.blue, "font-size": 15, "font-weight": 800, "text-anchor": x > 1200 ? "middle" : "start" }, g, "moved here");
     }
   }
 }

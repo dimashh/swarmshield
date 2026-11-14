@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `hub`: dashboard draws any attacker with a fake shop inside it even before its first request there; shorter "moved here" label beside the dot (Product)
 - 2026-11-14 `hub`: dashboard moves a caught attacker into its own fake shop on its first reality request even if it fails (live run showed 4/4 caught while dots sat in the real shop); one failed-tip caption at a time under the lanes; attacker names above/below dots and bait tags beside them so they don't cover shop labels (Product)
 - 2026-11-14 `hub`: starting a round writes a `commentary` line to `events.jsonl`, so a hub restart before the round's first event doesn't reuse its id (Product)
 - 2026-11-14 `hub`: `Optional[int]` instead of `int | None` so the hub starts on macOS's stock Python 3.9 (suite and all apps verified on 3.9) (Senior)
