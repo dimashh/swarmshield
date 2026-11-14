@@ -32,7 +32,7 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 
 - **Shield OFF works:** flag at 15.5s, as planned.
 - **Shield ON (swarm PR #4 at f276fac): detect 7.6s (target < 5s), 0 real hits after detection, 27 contradictions, all 4 agents lone, split at 35.8s (target 20-30s).** An earlier swarm build only reached 1/4 lone: a lone agent stops posting, so teammates kept trusting it. Fixed swarm-side by going lone once every teammate it relied on is distrusted.
-- **Shopper not running yet:** `legit_ok`/`legit_fail` are 0/0 but the hub reports `legit_pct` 100. Don't quote "100% legit" until the shopper runs.
+- **Shopper runs (swarm `swarm/legit.py`):** 30/30 legit requests OK through the gateway in a 30s Shield ON run (all `forward_legit`, never flagged). `legit_pct` is now backed by real traffic.
 - **Fixed:** two parallel requests from one newly flagged agent could build two Wardens for it (seen live for coord-4). Warden assignment is now serialised.
 
 ## Red swarm (`swarm/run.py`, Graduate)
