@@ -38,7 +38,7 @@ After `git pull`, always restart `./run_demo.sh` and hard-refresh the dashboard 
 - **Stages (Shield ON):** 1 attackers hit the API → 2 Sentinel spots the swarm → 3 Wardens spawn fake APIs → 4 shared tips start failing → 5 the swarm falls apart.
 - `?mock=1` shows `hub/static/mock_state.json` instead of live data. With only the hub running, `python -m hub.fake_round both` plays a scripted OFF then ON round (backup demo).
 
-**Typical live numbers** (this machine; they vary run to run): Shield OFF, the prize is stolen in about 15s. Shield ON, the swarm is spotted in about 6-8s, all 4 attackers are moved to Wardens, 0 real-API hits after detection, the real customer stays at 100%. How many attackers go alone varies (1 to 4 of 4 in 30-60s).
+**Typical live numbers** (this machine; they vary run to run): Shield OFF, the prize is stolen in about 15s. Shield ON, the swarm is spotted in about 6-8s, all 4 attackers are moved to Wardens, 0 real-API hits after detection, the real customer stays at 100%. All 4 attackers go alone, the first at about 17-22s and the last by about 30-35s of round time.
 
 ## How it works
 
