@@ -3,8 +3,7 @@ import threading
 import httpx
 from fastapi.testclient import TestClient
 
-from common.schema import FLAG, MAX_STEPS, RED_AGENTS, TRUST_START
-from common.schema import TRUST_FAIL, TRUST_START
+from common.schema import FLAG, MAX_STEPS, RED_AGENTS, TRUST_FAIL, TRUST_START
 from swarm.run import Agent, LocalBoard, method_for, run_round, score
 from target.app import app as target_app
 

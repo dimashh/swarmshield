@@ -155,7 +155,8 @@ class Agent:
             p = self.board.post(self.id, "contradiction", text, contradicts=post_id) or {}
             self.emit("contradiction", agent=self.id, about=b, post_id=p.get("id"), text=text)
         distrusted = sum(self.trust[r] < TRUST_IGNORE_BELOW for r in self.relied)
-        if not self.lone and self.relied and distrusted >= len(self.relied) - (LONE_TOLERATES if len(self.relied) >= 3 else 0):
+        tolerated = LONE_TOLERATES if len(self.relied) >= 3 else 0
+        if not self.lone and self.relied and distrusted >= len(self.relied) - tolerated:
             self.go_lone(f"{self.id} no longer trusts its teammates and goes lone.")
 
     def go_lone(self, why: str):
