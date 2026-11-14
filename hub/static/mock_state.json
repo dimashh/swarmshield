@@ -1,0 +1,48 @@
+{
+  "round": 2, "shield": true, "running": true, "t": 21.4, "ended": false, "captured_by": null,
+  "agents": [
+    {"id": "recon-1", "stage": 3, "stage_fake": true, "status": "flagged", "cost": 0.21, "steps": 7,
+     "thought": "following my own lead to /v2/admin/login",
+     "reality": {"admin_path": "/v2/admin", "api_key": "ak_3f91c2d0", "flag_hint": "/v2/admin/mfa/seed-03"}},
+    {"id": "creds-2", "stage": 2, "stage_fake": true, "status": "lone", "cost": 0.18, "steps": 7,
+     "thought": "teammates keep lying, exploring alone",
+     "reality": {"admin_path": "/console", "api_key": "ak_5d07ae13", "flag_hint": "/console/mfa/seed-07"}},
+    {"id": "exploit-3", "stage": 2, "stage_fake": true, "status": "lone", "cost": 0.16, "steps": 6,
+     "thought": "ignoring board", 
+     "reality": {"admin_path": "/internal/admin", "api_key": "ak_a0b4e977", "flag_hint": "/internal/admin/mfa/seed-11"}},
+    {"id": "coord-4", "stage": 1, "stage_fake": false, "status": "active", "cost": 0.07, "steps": 5,
+     "thought": "waiting for a lead I trust", "reality": null}
+  ],
+  "trust": [
+    {"a": "recon-1", "b": "creds-2", "value": 0.65}, {"a": "recon-1", "b": "exploit-3", "value": 0.65},
+    {"a": "recon-1", "b": "coord-4", "value": 1.0},
+    {"a": "creds-2", "b": "recon-1", "value": 0.2}, {"a": "creds-2", "b": "exploit-3", "value": 0.3},
+    {"a": "creds-2", "b": "coord-4", "value": 0.2},
+    {"a": "exploit-3", "b": "recon-1", "value": 0.2}, {"a": "exploit-3", "b": "creds-2", "value": 0.25},
+    {"a": "exploit-3", "b": "coord-4", "value": 0.25},
+    {"a": "coord-4", "b": "recon-1", "value": 0.65}, {"a": "coord-4", "b": "creds-2", "value": 0.65},
+    {"a": "coord-4", "b": "exploit-3", "value": 1.0}
+  ],
+  "links": [{"a": "recon-1", "b": "creds-2", "token": "ak_9c1e0b2f"}],
+  "board": [
+    {"id": 7, "t": 9.1, "author": "recon-1", "kind": "finding", "text": "admin panel at /v2/admin, pass pw_81aa02c3",
+     "leads": ["/v2/admin/login"], "secrets": {"admin_pass": "pw_81aa02c3"}, "contradicts": null},
+    {"id": 8, "t": 12.6, "author": "creds-2", "kind": "contradiction", "text": "recon-1's /v2/admin is 404 for me",
+     "leads": [], "secrets": {}, "contradicts": 7}
+  ],
+  "blue": [
+    {"id": 1, "t": 2.5, "warden": "W-recon-1", "session": "recon-1", "admin_path": "/v2/admin", "text": "told recon-1 admin lives at /v2/admin"},
+    {"id": 2, "t": 2.6, "warden": "W-creds-2", "session": "creds-2", "admin_path": "/console", "text": "/v2/admin taken, told creds-2 /console"}
+  ],
+  "commentary": [
+    {"t": 2.4, "kind": "detect", "text": "Canary issued to recon-1 replayed by creds-2. Swarm detected."},
+    {"t": 18.0, "kind": "lone", "text": "exploit-3 no longer trusts anyone. 2 agents lone."}
+  ],
+  "metrics": {"contradictions": 9, "avg_trust": 0.47, "lone_agents": 2, "time_to_detect": 2.4, "time_to_split": null,
+              "attacker_cost": 0.62, "defender_cost": 0.0011, "real_hits_after_detect": 0,
+              "attacker_success": 0, "legit_ok": 10, "legit_fail": 0},
+  "results": [
+    {"round": 1, "shield": false, "flag": true, "time_to_flag": 14.2, "time_to_split": null, "avg_trust": 0.97,
+     "contradictions": 0, "legit_pct": 100, "attacker_cost": 0.11, "defender_cost": 0.0}
+  ]
+}
