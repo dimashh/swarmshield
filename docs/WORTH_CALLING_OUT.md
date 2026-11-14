@@ -19,6 +19,7 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 - **Honey links are only on page-shaped JSON.** HTML, OpenAPI documents and other formats are not baited.
 - **A Warden is only as convincing as its route table.** It mirrors one known kill chain. An attacker that probes routes outside it, compares timing or response headers against the real app, or reads the real OpenAPI before being flagged can spot the fake.
 - **Endless MFA hints are a tell.** Seed-NN → NN+1 forever is cheap for us, but a careful attacker notices the loop. Good enough to burn tokens and time, not to fool a human for long.
+- **Sentinel is a rule set, not an agent.** It applies fixed rules (canary reuse, honey link, unpublished path, rate, 404s) and posts its alerts to the blue board; it doesn't learn or reason.
 - **Wardens are scripted, not agents.** "Blue swarm" coordination is a shared board so two Wardens never give out the same admin path. They don't reason or adapt.
 - **Defender cost is simulated.** `defender_cost` is a fixed price per fake page, not a measured cost.
 

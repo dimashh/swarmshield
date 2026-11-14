@@ -1,10 +1,15 @@
-"""Swarm detection. Only flags when Shield is ON.
+"""Sentinel: the blue swarm's detector. Flags sessions (only when Shield is ON) and posts each alert to the
+blue board so the Wardens and the dashboard see who was caught and why.
 Strong: linked canary cluster, honey link visited, real admin path used without ever being shown it.
 Backup: 5x 404, or a request rate no paced agent or human produces."""
+import asyncio
 import time
 
+from common import hub
 from common.schema import DETECT_404_LIMIT, DETECT_MIN_CLUSTER, RATE_LIMIT, RATE_WINDOW_S
 from shield.state import RoundState
+
+NAME = "Sentinel"
 
 
 def on_link(state: RoundState, owner: str, reuser: str) -> list:
@@ -44,3 +49,12 @@ def _flag(state: RoundState, sessions: list) -> list:
     new = [s for s in sessions if s not in state.flagged and s not in state.legit]
     state.flagged.update(new)
     return new
+
+
+async def alert(state: RoundState, new: list, reason: str, send):
+    """Announce newly flagged sessions: `detected` event, blue board post, commentary."""
+    send("detected", sessions=sorted(state.flagged), reason=reason)
+    what = "Swarm" if len(new) > 1 or len(state.cluster(new[0])) > 1 else "Attacker"
+    text = f"{reason[0].upper()}{reason[1:]}. {what} detected, flagged {', '.join(sorted(new))}"
+    await asyncio.to_thread(hub.post_blue, NAME, ", ".join(sorted(new)), None, text)
+    send("commentary", kind="detect", text=f"{NAME}: {text}")

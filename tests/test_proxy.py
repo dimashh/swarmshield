@@ -232,7 +232,8 @@ def test_realities_differ_and_cross_reality_fails(gw, fake_blue):
     _detect(c, app)
     wardens = app.state.round.wardens
     assert wardens["recon-1"].facts["admin_path"] != wardens["creds-2"].facts["admin_path"]
-    assert {p["admin_path"] for p in fake_blue} == {w.facts["admin_path"] for w in wardens.values()}
+    assert {p["admin_path"] for p in fake_blue if p["warden"] != "Sentinel"} == \
+        {w.facts["admin_path"] for w in wardens.values()}
     r_docs, _, r_bak, r_login, _, _ = _walk(c, "recon-1")
     r = c.post(r_bak["links"][0], json={"user": "admin", "password": r_bak["secrets"]["admin_pass"]},
                headers=H("creds-2"))
@@ -341,3 +342,12 @@ def test_own_pre_flag_alias_maps_into_reality(gw):
     adm = app.state.round.wardens["recon-1"].facts["admin_path"]
     r = c.post(bak["links"][0], json={"user": "admin", "password": bak["secrets"]["admin_pass"]}, headers=H("recon-1"))
     assert r.status_code == 200 and r.json()["links"] == [f"{adm}/flag"]
+
+
+def test_sentinel_posts_alert_to_blue_board_before_wardens(gw, fake_blue):
+    c, events, app = gw
+    _detect(c, app)
+    assert fake_blue[0]["warden"] == "Sentinel" and fake_blue[0]["admin_path"] is None
+    assert fake_blue[0]["session"] == "creds-2, recon-1" and "recon-1 replayed by creds-2" in fake_blue[0]["text"]
+    assert [p["warden"] for p in fake_blue[1:]] == ["W-creds-2", "W-recon-1"]
+    assert any(e["type"] == "commentary" and e["text"].startswith("Sentinel: ") for e in events)

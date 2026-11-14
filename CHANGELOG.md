@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `shield`: detection is now the named **Sentinel** (`shield/detect.py` -> `shield/sentinel.py`); every alert is posted to the blue board as `warden:"Sentinel"` (`admin_path:null`) before the Wardens post, plus `Sentinel:` commentary (Senior)
 - 2026-11-14 `docs`: `docs/PRESENTATION_MATERIAL.md` §0 goals and angles: swarm vs swarm as the core angle, red vs blue agent table, Sentinel added to the blue swarm (to-refine task for Senior), deploy-ready gateway goal (Devin)
 - 2026-11-14 `docs`: `docs/PRESENTATION_MATERIAL.md` pitch draft: one-liner, 3-min script, novelty claim, countermeasures, prior art, metrics, Q&A, caveats, to-refine list (Devin)
 - 2026-11-14 `docs`: `docs/PRESENTATION_MATERIAL.md`, problem-statement sources for the slides (Transluce agent-activity report: facts, quotes, caveats, mapping to SwarmShield) (Senior)

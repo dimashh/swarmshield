@@ -102,6 +102,7 @@ Mock dashboard data is in `hub/static/mock_state.json`.
    - Also flags (Shield ON only): visiting a honey link, using the real `/admin` path (it is never shown to agents), more than `RATE_LIMIT` requests in `RATE_WINDOW_S`.
    - Backup rule: ≥ `DETECT_404_LIMIT` 404s from one session.
    - `detected.reason` is free text for the dashboard.
+   - The detector is named **Sentinel** (`shield/sentinel.py`). Each alert is also posted to the blue board as `{"warden":"Sentinel","session":"a, b","admin_path":null,"text":…}`, before the Wardens post.
    - With Shield OFF, links are still emitted, but nothing is ever flagged.
 5. **Route:** a flagged session goes to its Warden, with `routed:"reality"`. Everything else is forwarded to `TARGET_URL`, with `routed:"real"`. Emit `request` for every call.
 6. **Outbound** (forwarded responses only): replace every real secret, in both `secrets` and `text`/`links`, with that session's canary, and the real `/admin` prefix with a per-session alias `/admin-xxxx`. Copies rotate every `ROTATE_S`; a session's older copies keep working for it.
