@@ -57,7 +57,16 @@ def owner_of(state, item: str):
 
 
 async def assign(state, session: str, send) -> Warden:
-    """Build facts, pick an admin_path unused by other Wardens, post to the blue board."""
+    """Build facts, pick an admin_path unused by other Wardens, post to the blue board.
+    Serialised so concurrent requests from one session (or two new sessions) can't double-assign or pick the same path."""
+    lock = state.__dict__.setdefault("_assign_lock", asyncio.Lock())
+    async with lock:
+        if session in state.wardens:
+            return state.wardens[session]
+        return await _assign(state, session, send)
+
+
+async def _assign(state, session: str, send) -> Warden:
     facts = base_facts(state.id, session)
     blue = await asyncio.to_thread(hub.get_blue)
     taken = sorted({p.get("admin_path") for p in blue if p.get("admin_path")} |

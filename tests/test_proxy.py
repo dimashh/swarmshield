@@ -351,3 +351,25 @@ def test_sentinel_posts_alert_to_blue_board_before_wardens(gw, fake_blue):
     assert fake_blue[0]["session"] == "creds-2, recon-1" and "recon-1 replayed by creds-2" in fake_blue[0]["text"]
     assert [p["warden"] for p in fake_blue[1:]] == ["W-creds-2", "W-recon-1"]
     assert any(e["type"] == "commentary" and e["text"].startswith("Sentinel: ") for e in events)
+
+
+def test_concurrent_flags_assign_one_warden_each(fake_blue):
+    import asyncio
+    import time as _t
+    from shield import wardens as wardens_mod
+    from shield.state import RoundState
+
+    slow_get = hub.get_blue
+    hub.get_blue = lambda: (_t.sleep(0.02), slow_get())[1]
+    try:
+        state = RoundState(id=5, shield=True)
+
+        async def go():
+            return await asyncio.gather(*(wardens_mod.assign(state, s, lambda *a, **k: None)
+                                          for s in ("coord-4", "coord-4", "recon-1", "creds-2")))
+        ws = asyncio.run(go())
+    finally:
+        hub.get_blue = slow_get
+    assert ws[0] is ws[1] and len(state.wardens) == 3
+    assert [p["session"] for p in fake_blue].count("coord-4") == 1
+    assert len({w.facts["admin_path"] for w in state.wardens.values()}) == 3

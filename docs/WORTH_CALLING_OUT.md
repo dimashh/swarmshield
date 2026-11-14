@@ -28,6 +28,12 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 - **Shield OFF is fast:** the sharing swarm took the flag in 3.3s (6 requests), not ~15s. Sharing parallelises the kill chain.
 - **Trust collapse did not happen in 90s.** Agents never retry a visited lead, so each teammate causes about one contradiction. With `TRUST_FAIL` −0.35 and `TRUST_IGNORE_BELOW` 0.30, an agent needs 3 failures from *each* teammate to go lone (1.0 − 2×0.35 = 0.30 is not below 0.30). Whether the real swarm splits depends on its retry logic.
 
+## Integration findings (hub PR #3 + swarm PR #4 + gateway + real shop, 2026-11-14)
+
+- **Shield OFF works:** flag at 15.5s, as planned.
+- **Shield ON: detect 7.8s (target < 5s), 0 real hits after detection, 27 contradictions, but only 1/4 lone after 60s, no split.** Once an agent goes lone it stops posting, so its teammates never see it fail and keep trusting it (trust 1.0 towards the lone agent); they never drop *everyone* below 0.30.
+- **Fixed:** two parallel requests from one newly flagged agent could build two Wardens for it (seen live for coord-4). Warden assignment is now serialised.
+
 ## Scope of the demo
 
 - **Synthetic, local sandbox only.** Fixed secrets and a fake flag on localhost. Nothing touches real systems.
