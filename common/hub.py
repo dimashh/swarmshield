@@ -61,6 +61,7 @@ class Emitter:
         self._client = httpx.Client(timeout=TIMEOUT_S, transport=transport)
         self._q = queue.Queue()
         self._flush_s = flush_s
+        self._down = False
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -80,8 +81,13 @@ class Emitter:
             return
         try:
             self._client.post(self._url, json=batch).raise_for_status()
+            if self._down:
+                print("[hub] reachable again")
+            self._down = False
         except httpx.HTTPError as e:
-            print(f"[hub] dropped {len(batch)} events ({e!r}): {batch}")
+            if not self._down:
+                print(f"[hub] dropped {len(batch)} events ({e!r}); hub down, dropping silently until it is back")
+            self._down = True
 
     def _run(self):
         while True:
