@@ -12,6 +12,7 @@ Local, sandboxed hackathon demo: toy target, scripted red agents and synthetic d
 | [docs/COMPETITOR_RESEARCH.md](docs/COMPETITOR_RESEARCH.md) | Competitor and prior-art research |
 | [docs/flows.html](docs/flows.html) | Flows as pictures (download and open in a browser) |
 | [common/schema.py](common/schema.py) | Shared constants and helpers (`python common/schema.py` self-checks) |
+| [common/hub.py](common/hub.py) | Hub client: `get_round`, board/blue helpers, non-blocking `emit` |
 | [hub/static/mock_state.json](hub/static/mock_state.json) | Example `/api/state` for building the dashboard |
 
 ## Owners
@@ -27,3 +28,5 @@ uvicorn hub.app:app --port 8000
 python -m swarm.run
 ```
 Then open http://localhost:8000.
+
+Tests: `pip install -r requirements-dev.txt && python -m pytest tests`

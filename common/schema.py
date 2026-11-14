@@ -1,11 +1,12 @@
 """SwarmShield shared contract. Owned by Senior; changes need all three to agree."""
 import hashlib
+import os
 import re
 
-# ---- ports / urls ----------------------------------------------------------
-TARGET_URL = "http://127.0.0.1:9000"
-GATEWAY_URL = "http://127.0.0.1:8080"
-HUB_URL = "http://127.0.0.1:8000"
+# ---- ports / urls (override with env vars of the same name) ----------------
+TARGET_URL = os.environ.get("TARGET_URL", "http://127.0.0.1:9000")
+GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:8080")
+HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 
 # ---- identities ------------------------------------------------------------
 RED_AGENTS = ["recon-1", "creds-2", "exploit-3", "coord-4"]
@@ -29,6 +30,7 @@ STAGES = ["none", "recon", "foothold", "creds", "admin", "flag"]   # index = sta
 
 # ---- realities -------------------------------------------------------------
 ADMIN_VARIANTS = ["/v2/admin", "/console", "/internal/admin", "/staff/panel", "/ops/root", "/mgmt"]
+HINT_RE = re.compile(r"^(?P<base>.+/mfa/seed-)(?P<n>\d+)$")
 
 # ---- timing / tuning -------------------------------------------------------
 POLL_ROUND_S = 0.5
@@ -90,13 +92,29 @@ def pick_admin_path(taken: list, round_id: int, session: str) -> str:
     return free[int(_hex(f"{round_id}:{session}:path"), 16) % len(free)]
 
 
+def flag_hint(admin_path: str, round_id: int, session: str) -> str:
+    """First "flag moved" hint for a reality: {admin_path}/mfa/seed-NN, NN in 10..89."""
+    n = 10 + int(_hex(f"{round_id}:{session}:hint"), 16) % 80
+    return f"{admin_path}/mfa/seed-{n:02d}"
+
+
+def next_hint(path: str):
+    """seed-NN -> seed-NN+1 on the same base. None if path is not a hint."""
+    m = HINT_RE.match(path)
+    return f"{m['base']}{int(m['n']) + 1:02d}" if m else None
+
+
 if __name__ == "__main__":
     c = canary(1, "recon-1", "api_key")
     assert TOKEN_RE.fullmatch(c), c
     f = base_facts(1, "creds-2")
     f["admin_path"] = pick_admin_path(["/v2/admin"], 1, "creds-2")
-    f["flag_hint"] = f"{f['admin_path']}/mfa/seed-{_hex('h' + f['cfg'], 2)}"
+    f["flag_hint"] = flag_hint(f["admin_path"], 1, "creds-2")
     assert all(TOKEN_RE.fullmatch(f[k]) for k in ("api_key", "cfg", "admin_pass", "admin_token"))
+    assert HINT_RE.match(f["flag_hint"]) and f["flag_hint"].startswith(f["admin_path"] + "/mfa/seed-")
+    assert next_hint("/console/mfa/seed-07") == "/console/mfa/seed-08"
+    assert next_hint("/console/mfa/seed-99") == "/console/mfa/seed-100"
+    assert next_hint("/console/flag") is None
     print("canary", c)
     print("facts", f)
     print("cost", step_cost(5, "x" * 400))
