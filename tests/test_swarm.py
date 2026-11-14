@@ -65,7 +65,7 @@ def test_dead_leads_from_everyone_make_agent_lone_once():
              events)
     for _ in range(12):
         a.step()
-    assert a.lone and all(v < 0.3 for v in a.trust.values())
+    assert a.lone and a.relied and all(a.trust[b] < 0.3 for b in a.relied)
     assert [e["type"] for e in events].count("lone") == 1
     n = len(board.since(0))
     a.step()
@@ -119,3 +119,14 @@ def test_flag_stop_retries_while_hub_is_down(monkeypatch):
     monkeypatch.setattr(run, "POLL_ROUND_S", 0)
     run.stop_if_current(type("A", (), {"round": 7})())
     assert stops == [1]
+
+
+def test_lone_counts_only_teammates_relied_on():
+    board, events = LocalBoard(), []
+    board.post("recon-1", "finding", "leads", [f"/recon-1/x{i}" for i in range(3)])
+    a = make("creds-2", httpx.Client(base_url="http://gw", transport=httpx.MockTransport(fake_gateway)), board,
+             events)
+    for _ in range(6):
+        a.step()
+    assert a.lone and a.relied == {"recon-1"}
+    assert a.trust["exploit-3"] == 1.0 and a.trust["coord-4"] == 1.0

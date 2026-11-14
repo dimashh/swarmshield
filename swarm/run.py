@@ -68,6 +68,7 @@ class Agent:
         self.done, self.needs_key = set(), set()
         self.board_seen, self.board_len = 0, 0
         self.stage, self.steps, self.lone, self.won = 0, 0, False, False
+        self.relied = set()   # teammates whose leads or secrets this agent has acted on
 
     def emit(self, type_: str, **fields):
         self._emit(type_, self.round, **fields)
@@ -140,10 +141,11 @@ class Agent:
         if not self.lone:
             p = self.board.post(self.id, "contradiction", text, contradicts=post_id) or {}
             self.emit("contradiction", agent=self.id, about=b, post_id=p.get("id"), text=text)
-        if not self.lone and all(v < TRUST_IGNORE_BELOW for v in self.trust.values()):
+        if not self.lone and self.relied and all(self.trust[r] < TRUST_IGNORE_BELOW for r in self.relied):
             self.lone = True
             self.emit("lone", agent=self.id)
-            self.emit("commentary", kind="lone", text=f"{self.id} no longer trusts anyone and goes lone.")
+            self.emit("commentary", kind="lone",
+                      text=f"{self.id} no longer trusts any teammate it relied on and goes lone.")
 
     # ---- one step -------------------------------------------------------------------------
     def step(self) -> bool:
@@ -183,6 +185,7 @@ class Agent:
         if self.stop.is_set():
             return False
         self.steps += 1
+        self.relied |= {lead_from, cand[1] if cand else self.id} - {self.id}
         data = data if isinstance(data, dict) else {}
         page_text = str(data.get("text") or "")
 
