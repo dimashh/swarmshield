@@ -19,6 +19,7 @@ from swarm.legit import PAUSED, run_shopper, wait_if_paused
 
 FLAG_LOCK = threading.Lock()
 SCORES = {"flag": 50, "admin": 28, "login": 26, "backup": 22, "users": 15, "docs": 10}
+QUIET_S = 3 * STEP_S   # a teammate that hasn't posted for this long has left the swarm
 STAGE_OF = {"api_key": 1, "cfg": 2, "admin_pass": 3, "admin_token": 4}
 HEADER_OF = {"api_key": H_API_KEY, "admin_token": H_ADMIN}
 WHAT = {"api_key": "key", "cfg": "config", "admin_pass": "admin password", "admin_token": "admin token"}
@@ -75,6 +76,8 @@ class Agent:
         self.board_seen, self.board_len = 0, 0
         self.stage, self.steps, self.lone, self.won = 0, 0, False, False
         self.relied = set()   # teammates whose leads or secrets this agent has acted on
+        self.last_post = {}   # teammate -> when we last saw it post on the board
+        self.burned = set()   # secret kinds where a teammate's value failed: prefer our own from then on
 
     def emit(self, type_: str, **fields):
         self._emit(type_, self.round, **fields)
@@ -85,6 +88,7 @@ class Agent:
             self.board_seen = max(self.board_seen, p["id"])
             self.board_len += 1
             b = p["author"]
+            self.last_post[b] = time.monotonic()
             if b == self.id or b not in self.trust or not self.trusts(b):
                 continue
             if p.get("kind") == "finding":
@@ -94,6 +98,10 @@ class Agent:
         new_leads = [l for l in leads if l not in self.leads]
         for l in new_leads:
             self.leads[l] = (src, post_id)
+        if src == self.id:   # seen on our own page: a distrusted teammate's copy of the lead is ours now
+            for l in leads:
+                if not self.trusts(self.leads[l][0]):
+                    self.leads[l] = (self.id, None)
         new_secrets = {}
         for kind, value in secrets.items():
             cands = self.secrets.setdefault(kind, [])
@@ -103,10 +111,18 @@ class Agent:
         return new_leads, new_secrets
 
     def best(self, kind: str):
-        """Trust the team: the newest teammate's secret that hasn't failed yet, else our own."""
+        """Trust the team: the newest teammate's secret that hasn't failed yet, else our own.
+        Once a teammate's secret of this kind has failed for us, our own comes first."""
         alive = [c for c in self.secrets.get(kind, []) if c[3] and self.trusts(c[1])]
         theirs = [c for c in alive if c[1] != self.id]
+        if kind in self.burned:
+            mine = [c for c in alive if c[1] == self.id]
+            return (mine[::-1] or theirs[::-1] or [None])[0]
         return (theirs[::-1] or alive[::-1] or [None])[0]
+
+    def quiet(self, b: str) -> bool:
+        """b has stopped posting (gone lone, or stuck), so it will never fail us again and can't hold us back."""
+        return time.monotonic() - self.last_post.get(b, 0.0) > QUIET_S
 
     def trusts(self, b: str) -> bool:
         return b == self.id or (not self.lone and self.trust.get(b, 0) >= TRUST_IGNORE_BELOW)
@@ -147,7 +163,12 @@ class Agent:
         if not self.lone:
             p = self.board.post(self.id, "contradiction", text, contradicts=post_id) or {}
             self.emit("contradiction", agent=self.id, about=b, post_id=p.get("id"), text=text)
-        if not self.lone and self.relied and all(self.trust[r] < TRUST_IGNORE_BELOW for r in self.relied):
+        self.check_lone()
+
+    def check_lone(self):
+        """Lone once a teammate we relied on burned us and every other one we relied on is burned or quiet."""
+        burned_by = {r for r in self.relied if self.trust[r] < TRUST_IGNORE_BELOW}
+        if not self.lone and burned_by and all(r in burned_by or self.quiet(r) for r in self.relied):
             self.lone = True
             self.emit("lone", agent=self.id)
             self.emit("commentary", kind="lone",
@@ -161,10 +182,15 @@ class Agent:
         acted = self.act()
         if not self.stop.is_set():
             self.read_board()
+            self.check_lone()
         return acted
 
     def act(self) -> bool:
         action = self.choose()
+        distrusts_someone = any(v < TRUST_IGNORE_BELOW for v in self.trust.values())
+        if not action and distrusts_someone and ("GET", "/") not in self.done:
+            self.leads["/"] = (self.id, None)   # stuck on distrusted tips: start over on our own from /
+            action = self.choose()
         if not action:
             return False
         path, method, kind = action
@@ -205,6 +231,7 @@ class Agent:
             cand[3] = False
             src = cand[1]
             if src != self.id:
+                self.burned.add(kind)
                 self.contradict(src, f"{src}'s {WHAT[kind]} is invalid for me", cand[2])
         elif status == 401:
             self.needs_key.add(path)

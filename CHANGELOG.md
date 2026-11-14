@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `swarm`: split fix: after a teammate's secret fails an agent uses its own for that kind, stuck agents start over from `/`, and `lone` also counts relied-on teammates that have gone quiet for `3 × STEP_S` (real hub: 3+ lone in 9 of 12 Shield ON rounds, was 0 of 3); CONTRACTS §5 and WORTH_CALLING_OUT updated (Graduate)
 - 2026-11-14 `hub`: dashboard served with `Cache-Control: no-store`; shows "HUB IS OUTDATED · restart ./run_demo.sh" when the hub predates pause support (Senior)
 - 2026-11-14 `hub`: dashboard step mode (default): the round pauses as each stage begins, `N`/→ moves on; `A` toggles auto (no stage pauses), remembered per browser (Senior)
 - 2026-11-14 `hub`: Warden boxes only pop when spawned live, not on page refresh (Senior)
