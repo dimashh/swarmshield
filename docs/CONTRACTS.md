@@ -172,6 +172,7 @@ See `hub/static/mock_state.json` for a full example. The hub derives:
 - `agents[].stage`: the maximum `stage` from that agent's `step` events. `stage_fake` is true once the agent is flagged (its progress after that is in its own reality).
 - `agents[].reality`: from `reality_assigned`. `null` until the agent is flagged.
 - `agents[]` also has `flagged_at`, `lone_at`, `won_at` (round `t` or null), `caught_for` (first `detected.reason`), `bait` (latest from `request`), `rejected` (`warden_block`s from a teammate's value) and `complaints` (`contradiction`s it posted).
+- `requests`: the last 60 gateway `request` events from attackers and the shopper (the dashboard's API view).
 - `paused`: true while the round clock is frozen. `legit_pct` is `null` until the shopper has made a request.
 - `trust`: the latest value per directed pair. All 12 pairs start at 1.0.
 - `metrics`:

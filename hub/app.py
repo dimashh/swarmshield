@@ -14,7 +14,7 @@ from common.schema import RED_AGENTS, TRUST_IGNORE_BELOW, TRUST_START
 
 STATIC = Path(__file__).parent / "static"
 EVENTS_LOG = Path(__file__).resolve().parent.parent / "events.jsonl"
-BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP, STEPS_KEEP, BLOCKS_KEEP, REQUESTS_KEEP = 14, 20, 4, 40, 12, 40
+BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP, STEPS_KEEP, BLOCKS_KEEP, REQUESTS_KEEP = 14, 20, 4, 40, 12, 60
 SPLIT_AT_LONE = 3
 
 app = FastAPI(title="SwarmShield hub")
@@ -153,11 +153,11 @@ def _apply(ev):
             R.real_hits_after_detect += 1
         if s in R.agents and isinstance(ev.get("bait"), dict):
             _agent(s)["bait"] = {k: str(v) for k, v in ev["bait"].items()}
-        if s in R.agents:
+        if s in R.agents or ev.get("routed") == "forward_legit":
             R.requests.append({"t": ev["t"], "session": s, "method": ev.get("method", "GET"), "path": ev.get("path"),
                                "routed": ev.get("routed"), "status": ev.get("status")})
             del R.requests[:-REQUESTS_KEEP]
-        elif ev.get("routed") == "forward_legit":
+        if s not in R.agents and ev.get("routed") == "forward_legit":
             R.shopper = {"t": ev["t"], "method": ev.get("method"), "path": ev.get("path"), "status": ev.get("status")}
     elif typ == "canary_link":
         link = {"a": ev.get("a"), "b": ev.get("b"), "token": ev.get("token")}
