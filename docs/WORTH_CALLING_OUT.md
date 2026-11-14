@@ -22,6 +22,11 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 - **Wardens are scripted, not agents.** "Blue swarm" coordination is a shared board so two Wardens never give out the same admin path. They don't reason or adapt.
 - **Defender cost is simulated.** `defender_cost` is a fixed price per fake page, not a measured cost.
 
+## Rehearsal findings (`python -m shield.rehearse`, our simplified swarm)
+
+- **Shield OFF is fast:** the sharing swarm took the flag in 3.3s (6 requests), not ~15s. Sharing parallelises the kill chain.
+- **Trust collapse did not happen in 90s.** Agents never retry a visited lead, so each teammate causes about one contradiction. With `TRUST_FAIL` −0.35 and `TRUST_IGNORE_BELOW` 0.30, an agent needs 3 failures from *each* teammate to go lone (1.0 − 2×0.35 = 0.30 is not below 0.30). Whether the real swarm splits depends on its retry logic.
+
 ## Scope of the demo
 
 - **Synthetic, local sandbox only.** Fixed secrets and a fake flag on localhost. Nothing touches real systems.

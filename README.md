@@ -30,4 +30,6 @@ python -m swarm.run
 ```
 Then open http://localhost:8000.
 
+Run everything: `./run_demo.sh` (Ctrl-C stops). Shield rehearsal without the real swarm: `python -m shield.rehearse`
+
 Tests: `pip install -r requirements-dev.txt && python -m pytest tests`
