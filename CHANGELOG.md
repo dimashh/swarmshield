@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `presentation`: pitch moved to repo root as `presentation.html`; `presentation/` folder removed (chart is embedded in the HTML) (Zhaslan)
 - 2026-11-14 `docs`: README live numbers after the collapse tuning (all 4 lone by ~30-35s) (Senior)
 - 2026-11-14 `presentation`: HTML pitch `presentation/index.html` (11 slides: problem with Transluce timeline, Hugging Face incident, why patching isn't enough, red vs blue swarm, detect/deceive/disrupt, proxy placement, countermeasures, live demo handoff; arrow keys, F for full screen, single self-contained file) (Zhaslan)
 - 2026-11-14 `swarm`: lint fixes in the lone rule and swarm tests (Senior)
