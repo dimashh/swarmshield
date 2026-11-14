@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `hub`+`shield`+`swarm`: dashboard rework (red swarm cards with bait, status timeline red→orange→grey, Warden's story and counts; red board with contradictions; trust graph with same-key links; real-customer lane; Sentinel + 4 Warden slots that spawn; map and blue checklist dropped); pause (`P`, `POST /api/round/pause|resume|toggle`, swarm and shopper wait); gateway sends optional `bait` on `request`; hub keeps late `flag_captured`, per-agent timeline/counters, `legit_pct` null with no traffic; board/blue posts carry `round` so old-round stragglers are dropped (Senior)
 - 2026-11-14 `hub`: `Optional[int]` instead of `int | None` so the hub starts on macOS's stock Python 3.9 (suite and all apps verified on 3.9) (Senior)
 - 2026-11-14 `common`: `hub.stop_round()` flushes queued events first, so `flag_captured` reaches the hub before the round closes (Shield OFF rounds were recording `flag: false`) (Senior)
 - 2026-11-14 `hub`: merged PR #3 to `main` (hub API on :8000, live dashboard at `/`, `hub/fake_round.py` scripted backup round); `run_demo.sh` now uses the real hub instead of `shield/stubhub.py` (Product, merged by Senior)

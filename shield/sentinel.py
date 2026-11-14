@@ -56,5 +56,6 @@ async def alert(state: RoundState, new: list, reason: str, send):
     send("detected", sessions=sorted(state.flagged), reason=reason)
     what = "Swarm" if len(new) > 1 or len(state.cluster(new[0])) > 1 else "Attacker"
     text = f"{reason[0].upper()}{reason[1:]}. {what} detected, flagged {', '.join(sorted(new))}"
-    await asyncio.to_thread(hub.post_blue, NAME, ", ".join(sorted(new)), None, text)
+    await asyncio.to_thread(hub.post_blue, NAME, ", ".join(sorted(new)), None, text,
+                            round_id=state.id)
     send("commentary", kind="detect", text=f"{NAME}: {text}")

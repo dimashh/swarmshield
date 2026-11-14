@@ -77,7 +77,8 @@ async def _assign(state, session: str, send) -> Warden:
     state.wardens[session] = w
     text = (f"{', '.join(taken)} taken, told {session} {facts['admin_path']}" if taken
             else f"told {session} admin lives at {facts['admin_path']}")
-    await asyncio.to_thread(hub.post_blue, w.name, session, facts["admin_path"], text, facts)
+    await asyncio.to_thread(hub.post_blue, w.name, session, facts["admin_path"], text, facts,
+                            round_id=state.id)
     send("reality_assigned", session=session, warden=w.name,
          facts={k: facts[k] for k in ("api_key", "admin_path", "flag_hint")})
     send("commentary", kind="split", text=f"{w.name}: told {session} admin lives at {facts['admin_path']}")

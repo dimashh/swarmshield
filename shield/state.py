@@ -18,6 +18,7 @@ class RoundState:
     n404: Counter = field(default_factory=Counter)
     legit: set = field(default_factory=set)         # sessions seen with a valid Bearer token
     wardens: dict = field(default_factory=dict)     # session -> Warden
+    baited: dict = field(default_factory=dict)      # session -> bait last reported to the hub
     defender_usd: float = 0.0
     cost_sent_at: float = 0.0
 

@@ -34,9 +34,13 @@ def stop_round(base_url: str = None):
     return _request("POST", "/api/round/stop", base_url=base_url)
 
 
-def post_board(author: str, kind: str, text: str, leads=None, secrets=None, contradicts=None, base_url: str = None):
+def post_board(author: str, kind: str, text: str, leads=None, secrets=None, contradicts=None, base_url: str = None,
+               round_id: int = None):
+    """Pass round_id so a straggler from an old round can't post into the new one (the hub drops it)."""
     body = {"author": author, "kind": kind, "text": text, "leads": leads or [],
             "secrets": secrets or {}, "contradicts": contradicts}
+    if round_id is not None:
+        body["round"] = round_id
     return _request("POST", "/api/board", json=body, base_url=base_url)
 
 
@@ -44,8 +48,11 @@ def get_board(since: int = 0, base_url: str = None) -> list:
     return _request("GET", "/api/board", params={"since": since}, base_url=base_url) or []
 
 
-def post_blue(warden: str, session: str, admin_path: str, text: str, facts=None, base_url: str = None):
+def post_blue(warden: str, session: str, admin_path: str, text: str, facts=None, base_url: str = None,
+              round_id: int = None):
     body = {"warden": warden, "session": session, "admin_path": admin_path, "text": text}
+    if round_id is not None:
+        body["round"] = round_id
     if facts is not None:
         body["facts"] = facts
     return _request("POST", "/api/blue", json=body, base_url=base_url)

@@ -46,7 +46,7 @@ async def login(request: Request):
 def fake_blue(monkeypatch):
     posts = []
     monkeypatch.setattr(hub, "get_blue", lambda: list(posts))
-    monkeypatch.setattr(hub, "post_blue", lambda warden, session, admin_path, text, facts=None: posts.append(
+    monkeypatch.setattr(hub, "post_blue", lambda warden, session, admin_path, text, facts=None, **kw: posts.append(
         {"warden": warden, "session": session, "admin_path": admin_path, "text": text}))
     return posts
 
@@ -64,8 +64,12 @@ def test_pass_through_get_and_headers(gw):
     c, events, _ = gw
     r = c.get("/api/docs", headers={"X-Agent-Id": "recon-1"})
     assert r.status_code == 200 and r.json()["title"] == "API docs"
+    bait = events[0].pop("bait")
     assert events[0] == {"type": "request", "session": "recon-1", "method": "GET", "path": "/api/docs",
                          "routed": "real", "status": 200}
+    assert bait["api_key"].startswith("ak_") and bait["admin_path"].startswith("/admin-")
+    c.get("/api/docs", headers={"X-Agent-Id": "recon-1"})
+    assert "bait" not in events[1]       # only re-sent when it changes
 
 
 def test_post_body_and_query(gw):

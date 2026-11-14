@@ -10,6 +10,14 @@ import httpx
 
 from common.schema import GATEWAY_URL, H_AGENT, LEGIT_TOKEN, SHOPPER_EVERY_S, SHOPPER_ID
 
+PAUSED = threading.Event()   # set while the hub round is paused; the swarm and shopper wait
+
+
+def wait_if_paused(stop: threading.Event):
+    while PAUSED.is_set() and not stop.is_set():
+        stop.wait(0.1)
+
+
 HEADERS = {H_AGENT: SHOPPER_ID, "Authorization": f"Bearer {LEGIT_TOKEN}"}
 UNREACHABLE = 503   # reported when the gateway can't be reached, so it counts as legit_fail
 
@@ -47,6 +55,7 @@ def run_shopper(round_id: int, url: str, emit, stop: threading.Event, every: flo
 
     with httpx.Client(base_url=url, timeout=5.0, transport=transport) as http:
         while not stop.is_set():
+            wait_if_paused(stop)
             shop_once(http, round_emit)
             stop.wait(every)
 

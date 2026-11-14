@@ -13,7 +13,7 @@ from target.app import app as target_app
 def fake_blue(monkeypatch):
     posts = []
     monkeypatch.setattr(hub, "get_blue", lambda: list(posts))
-    monkeypatch.setattr(hub, "post_blue", lambda w, s, a, t, f=None: posts.append({"admin_path": a}))
+    monkeypatch.setattr(hub, "post_blue", lambda w, s, a, t, f=None, **kw: posts.append({"admin_path": a}))
 
 
 @pytest.fixture

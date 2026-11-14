@@ -14,7 +14,7 @@ from common.schema import RED_AGENTS, TRUST_IGNORE_BELOW, TRUST_START
 
 STATIC = Path(__file__).parent / "static"
 EVENTS_LOG = Path(__file__).resolve().parent.parent / "events.jsonl"
-BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP, STEPS_KEEP, BLOCKS_KEEP, REQUESTS_KEEP = 14, 10, 4, 40, 12, 40
+BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP, STEPS_KEEP, BLOCKS_KEEP, REQUESTS_KEEP = 14, 20, 4, 40, 12, 40
 SPLIT_AT_LONE = 3
 
 app = FastAPI(title="SwarmShield hub")
@@ -28,10 +28,14 @@ class Round:
         self.id, self.shield, self.running = rid, shield, running
         self.started_at = time.time()
         self.stopped_at = None
+        self.paused_at = None      # wall time the current pause began, or None
+        self.paused_s = 0.0        # total paused seconds, excluded from t
         self.board, self.blue, self.commentary = [], [], []
         self.agents = {a: {"id": a, "stage": 0, "stage_real": 0, "stage_fake": False, "status": "active",
                            "cost": 0.0, "steps": 0, "thought": "", "reality": None,
-                           "flagged": False, "lone": False, "won": False} for a in RED_AGENTS}
+                           "flagged": False, "lone": False, "won": False, "flagged_at": None, "lone_at": None,
+                           "won_at": None, "caught_for": None, "bait": None, "complaints": 0, "rejected": 0}
+                       for a in RED_AGENTS}
         self.trust = {(a, b): TRUST_START for a in RED_AGENTS for b in RED_AGENTS if a != b}
         self.links = []
         self.contradictions = 0
@@ -48,8 +52,15 @@ class Round:
         self.shopper = None
 
     def t(self):
-        end = self.stopped_at or time.time()
-        return round(end - self.started_at, 1) if self.id else 0.0
+        end = self.stopped_at or self.paused_at or time.time()
+        return round(end - self.started_at - self.paused_s, 1) if self.id else 0.0
+
+    def set_paused(self, on: bool):
+        if on and self.paused_at is None and self.running:
+            self.paused_at = time.time()
+        elif not on and self.paused_at is not None:
+            self.paused_s += time.time() - self.paused_at
+            self.paused_at = None
 
 
 R = Round()
@@ -107,10 +118,13 @@ def _apply(ev):
             R.trust[key] = max(0.0, min(1.0, _num(ev.get("value"))))
     elif typ == "contradiction":
         R.contradictions += 1
+        if ev.get("agent") in R.agents:
+            _agent(ev["agent"])["complaints"] += 1
     elif typ == "lone" and ev.get("agent") in R.agents:
         ag = _agent(ev["agent"])
         if not ag["lone"]:
             ag["lone"] = True
+            ag["lone_at"] = ev["t"]
             R.lone_order.append(ag["id"])
             n = len(R.lone_order)
             _comment("lone", f"{ag['id']} no longer trusts anyone. {n} agent{'s' if n > 1 else ''} lone.")
@@ -121,6 +135,7 @@ def _apply(ev):
         aid = ev.get("agent")
         if aid in R.agents:
             _agent(aid)["won"] = True
+            _agent(aid)["won_at"] = ev["t"]
             _agent(aid)["stage"] = _agent(aid)["stage_real"] = 5
         if R.captured_by is None:
             R.captured_by = aid
@@ -136,6 +151,8 @@ def _apply(ev):
         s = ev.get("session")
         if ev.get("routed") == "real" and s in R.flagged:
             R.real_hits_after_detect += 1
+        if s in R.agents and isinstance(ev.get("bait"), dict):
+            _agent(s)["bait"] = {k: str(v) for k, v in ev["bait"].items()}
         if s in R.agents:
             R.requests.append({"t": ev["t"], "session": s, "method": ev.get("method", "GET"), "path": ev.get("path"),
                                "routed": ev.get("routed"), "status": ev.get("status")})
@@ -149,6 +166,8 @@ def _apply(ev):
     elif typ == "warden_block":
         R.blocks.append({"t": ev["t"], "session": ev.get("session"), "item": ev.get("item"),
                          "from": ev.get("from"), "status": ev.get("status")})
+        if ev.get("session") in R.agents and ev.get("from") in R.agents and ev.get("from") != ev.get("session"):
+            _agent(ev["session"])["rejected"] += 1
     elif typ == "detected":
         R.detections.append({"t": ev["t"], "sessions": ev.get("sessions") or [], "reason": ev.get("reason")})
         if R.time_to_detect is None:
@@ -156,11 +175,11 @@ def _apply(ev):
         for s in ev.get("sessions") or []:
             R.flagged.add(s)
             if s in R.agents:
-                _agent(s)["flagged"] = True
+                _flag(_agent(s), ev["t"], ev.get("reason"))
     elif typ == "reality_assigned" and ev.get("session") in R.agents:
         f = ev.get("facts") or {}
         ag = _agent(ev["session"])
-        ag["flagged"] = True
+        _flag(ag, ev["t"], None)
         R.flagged.add(ev["session"])
         ag["reality"] = {"admin_path": f.get("admin_path"), "api_key": f.get("api_key"),
                          "flag_hint": f.get("flag_hint"), "warden": ev.get("warden")}
@@ -168,6 +187,14 @@ def _apply(ev):
         R.defender_cost = _num(ev.get("usd"))
     elif typ == "commentary":
         _comment(ev.get("kind", "info"), ev.get("text", ""))
+
+
+def _flag(ag, t, reason):
+    ag["flagged"] = True
+    if ag["flagged_at"] is None:
+        ag["flagged_at"] = t
+    if reason and not ag["caught_for"]:
+        ag["caught_for"] = reason
 
 
 def _metrics():
@@ -180,8 +207,9 @@ def _metrics():
 
 
 def _legit_pct():
+    """None until the shopper has made a request, so the dashboard never shows 100% of nothing."""
     total = R.legit_ok + R.legit_fail
-    return round(100 * R.legit_ok / total) if total else 100
+    return round(100 * R.legit_ok / total) if total else None
 
 
 def _status(ag):
@@ -197,11 +225,13 @@ def _status(ag):
 def _stop():
     if not R.running:
         return
+    R.set_paused(False)
     R.running = False
     R.stopped_at = time.time()
     m = _metrics()
     if R.shield and not R.captured_by:
-        _comment("win", f"Round over. Flag safe, trust {m['avg_trust']}, legit {_legit_pct()}%.")
+        lp = _legit_pct()
+        _comment("win", f"Round over. Flag safe, trust {m['avg_trust']}, legit {'–' if lp is None else lp}%.")
     results.append({"round": R.id, "shield": R.shield, "flag": bool(R.captured_by),
                     "time_to_flag": R.time_to_flag, "time_to_split": R.time_to_split,
                     "time_to_detect": R.time_to_detect, "avg_trust": m["avg_trust"],
@@ -223,8 +253,11 @@ def round_ctl(mode: str, round: Optional[int] = None):
             if not _stale(round):
                 _stop()
             return {"ok": True}
+        if mode in ("pause", "resume", "toggle"):
+            R.set_paused(mode == "pause" or (mode == "toggle" and R.paused_at is None))
+            return {"ok": True, "paused": R.paused_at is not None}
         if mode not in ("on", "off"):
-            return {"ok": False, "error": "mode must be on, off or stop"}
+            return {"ok": False, "error": "mode must be on, off, stop, pause, resume or toggle"}
         _stop()
         last_id += 1
         R = Round(last_id, shield=(mode == "on"), running=True)
@@ -234,7 +267,7 @@ def round_ctl(mode: str, round: Optional[int] = None):
 
 @app.get("/api/round")
 def round_get():
-    return {"id": R.id, "shield": R.shield, "running": R.running, "t": R.t()}
+    return {"id": R.id, "shield": R.shield, "running": R.running, "paused": R.paused_at is not None, "t": R.t()}
 
 
 @app.post("/api/reset")
@@ -296,7 +329,16 @@ def events(body=Body(...)):
             _log(ev)
             if R.running:
                 _apply(ev)
+            elif ev.get("type") == "flag_captured" and R.id and R.captured_by is None:
+                _late_flag(ev)
     return {"ok": True}
+
+
+def _late_flag(ev):
+    """A flag_captured that arrives just after the round was stopped still counts for that round."""
+    _apply(ev)
+    if results and results[-1]["round"] == R.id:
+        results[-1].update(flag=True, time_to_flag=R.time_to_flag)
 
 
 # ---- state -----------------------------------------------------------------
@@ -307,8 +349,11 @@ def state():
         for ag in R.agents.values():
             agents.append({"id": ag["id"], "stage": ag["stage"], "stage_real": ag["stage_real"],
                            "stage_fake": ag["flagged"], "status": _status(ag), "cost": round(ag["cost"], 4),
-                           "steps": ag["steps"], "thought": ag["thought"], "reality": ag["reality"]})
-        return {"round": R.id, "shield": R.shield, "running": R.running, "t": R.t(),
+                           "steps": ag["steps"], "thought": ag["thought"], "reality": ag["reality"],
+                           **{k: ag[k] for k in ("flagged_at", "lone_at", "won_at", "caught_for", "bait",
+                                                 "complaints", "rejected")}})
+        return {"round": R.id, "shield": R.shield, "running": R.running, "paused": R.paused_at is not None,
+                "t": R.t(),
                 "ended": R.id > 0 and not R.running, "captured_by": R.captured_by,
                 "agents": agents,
                 "trust": [{"a": a, "b": b, "value": round(v, 2)} for (a, b), v in R.trust.items()],

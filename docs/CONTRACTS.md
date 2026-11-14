@@ -132,9 +132,10 @@ Mock dashboard data is in `hub/static/mock_state.json`.
 | Method and path | Body | Response |
 |---|---|---|
 | `POST /api/round/on` / `off` | | `{"id":2,"shield":true}`. Resets the board, blue board, events and agents, increments `id`, sets `running=true` and `started_at=now` |
-| `POST /api/round/stop` | | `{"ok":true}`. Sets `running=false`, appends to `results` |
-| `GET /api/round` | | `{"id":2,"shield":true,"running":true,"t":12.4}` |
-| `POST /api/board` | `{"author","kind":"finding"\|"contradiction","text","leads":[],"secrets":{},"contradicts":null\|id}` | the post with its `id` and `t` |
+| `POST /api/round/stop` | | `{"ok":true}`. Sets `running=false`, appends to `results`. A `flag_captured` for this round that arrives just after the stop still counts |
+| `POST /api/round/pause` / `resume` / `toggle` | | `{"ok":true,"paused":true}`. Freezes the round clock `t`. The swarm and shopper wait while `GET /api/round` says `paused` |
+| `GET /api/round` | | `{"id":2,"shield":true,"running":true,"paused":false,"t":12.4}` |
+| `POST /api/board` | `{"author","kind":"finding"\|"contradiction","text","leads":[],"secrets":{},"contradicts":null\|id,"round"?}` | the post with its `id` and `t`. With `round`, posts from an old round are dropped |
 | `GET /api/board?since=N` | | posts with `id > N`, oldest first |
 | `POST /api/blue` | `{"warden","session","admin_path","text"}` | the post with its `id` and `t` |
 | `GET /api/blue` | | all blue posts for the round |
@@ -157,7 +158,7 @@ Every event includes `{"type":…,"round":<id>}`, and the hub adds `t`.
 | `lone` | swarm | `agent` |
 | `flag_captured` | swarm | `agent, flag` |
 | `legit` | swarm (shopper) | `method, path, status` |
-| `request` | gateway | `session, method, path, routed:"real"\|"reality"\|"forward_legit", status` |
+| `request` | gateway | `session, method, path, routed:"real"\|"reality"\|"forward_legit", status`, optional `bait:{api_key, admin_path, honey?}` (what only this session is shown; sent when it changes) |
 | `canary_link` | gateway | `a` (owner), `b` (reuser), `token` |
 | `detected` | gateway | `sessions:[…], reason` |
 | `reality_assigned` | gateway | `session, warden, facts:{api_key, admin_path, flag_hint}` |
@@ -170,6 +171,8 @@ See `hub/static/mock_state.json` for a full example. The hub derives:
 - `agents[].status`: `won` if `flag_captured`, else `lone` if `lone`, else `flagged` if in `detected`, else `active`.
 - `agents[].stage`: the maximum `stage` from that agent's `step` events. `stage_fake` is true once the agent is flagged (its progress after that is in its own reality).
 - `agents[].reality`: from `reality_assigned`. `null` until the agent is flagged.
+- `agents[]` also has `flagged_at`, `lone_at`, `won_at` (round `t` or null), `caught_for` (first `detected.reason`), `bait` (latest from `request`), `rejected` (`warden_block`s from a teammate's value) and `complaints` (`contradiction`s it posted).
+- `paused`: true while the round clock is frozen. `legit_pct` is `null` until the shopper has made a request.
 - `trust`: the latest value per directed pair. All 12 pairs start at 1.0.
 - `metrics`:
   - `contradictions` (count)

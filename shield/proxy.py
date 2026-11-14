@@ -117,9 +117,15 @@ def create_app(upstream_transport: httpx.AsyncBaseTransport = None, poll: bool =
         elif canary.is_real_admin(path) and session not in state.flagged:
             await flag(sentinel.on_trap(state, session), f"{session} went straight to unpublished {path}")
 
+        extra = {}
+        b = canary.bait(state, session)
+        if state.baited.get(session) != b:
+            state.baited[session] = extra["bait"] = b
+
         if session in state.flagged:
             status, body_out = await wardens.handle(state, session, request.method, path, headers, body, send)
-            send("request", session=session, method=request.method, path=path, routed="reality", status=status)
+            send("request", session=session, method=request.method, path=path, routed="reality", status=status,
+                 **extra)
             return JSONResponse(body_out, status_code=status)
 
         sb = lambda t: canary.swap_back(t, state)  # noqa: E731
@@ -136,7 +142,7 @@ def create_app(upstream_transport: httpx.AsyncBaseTransport = None, poll: bool =
             if r.status_code == 404:
                 await flag(sentinel.on_404(state, session), f"{session} hit {state.n404[session]} dead routes")
         send("request", session=session, method=request.method, path=path, routed="real",
-             status=resp.status_code)
+             status=resp.status_code, **extra)
         return resp
 
     return app

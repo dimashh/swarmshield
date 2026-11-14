@@ -55,7 +55,8 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 ## Dashboard and hub
 
 - **The trust graph is red's own state.** Agents report their trust scores to the hub; a real defender cannot see inside the attacker, only infer the split from requests stopping and diverging.
-- **The map places dots by path pattern** from the gateway's `request` events (swarm `step` events as fallback). Routes outside the known kill chain are drawn at `/`; a real map would be built from the observed route table.
+- **Attacker cards show red's own state** (thoughts, trust, complaints, kill-chain stage) from swarm events. A real defender would only see the gateway side: Sentinel alerts, Warden assignments, rejected values and the "bait" each session was shown.
+- **Pause freezes the swarm, shopper and round clock, not the gateway.** Key/alias rotation (`ROTATE_S`) keeps ticking during a pause; old copies still work for their owner, so nothing breaks.
 - **The dashboard's story phases are inferred** from detections, realities and lone agents; a round that never detects stays on step 1.
 - **The hub keeps everything in memory.** Restarting it loses the round; only `events.jsonl` survives for replay.
 - **`fake_round` is a scripted replay for rehearsal,** not the real swarm; numbers on stage come from the live services.

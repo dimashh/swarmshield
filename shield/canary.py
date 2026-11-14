@@ -30,6 +30,14 @@ def honey_path(state: RoundState, session: str) -> str:
     return f"{HONEY_PREFIX}{_hex(f'{state.id}:{session}:honey', 6)}"
 
 
+def bait(state: RoundState, session: str) -> dict:
+    """What this session is currently being shown: its own key copy, admin alias and (Shield ON) honey link."""
+    b = {"api_key": canary(state.id, _seed(state, session), "api_key"), "admin_path": alias(state, session)}
+    if state.shield:
+        b["honey"] = honey_path(state, session)
+    return b
+
+
 def _rewrite(obj, fn):
     if isinstance(obj, str):
         return fn(obj)

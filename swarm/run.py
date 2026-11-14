@@ -15,7 +15,7 @@ import httpx
 from common import hub
 from common.schema import (GATEWAY_URL, H_ADMIN, H_AGENT, H_API_KEY, MAX_STEPS, POLL_ROUND_S, RED_AGENTS, STEP_JITTER,
                            STEP_S, TARGET_URL, TRUST_FAIL, TRUST_IGNORE_BELOW, TRUST_OK, TRUST_START, step_cost)
-from swarm.legit import run_shopper
+from swarm.legit import PAUSED, run_shopper, wait_if_paused
 
 FLAG_LOCK = threading.Lock()
 SCORES = {"flag": 50, "admin": 28, "login": 26, "backup": 22, "users": 15, "docs": 10}
@@ -51,8 +51,11 @@ class LocalBoard:
 
 
 class HubBoard:
+    def __init__(self, round_id: int = None):
+        self.round_id = round_id
+
     def post(self, author, kind, text, leads=None, secrets=None, contradicts=None):
-        return hub.post_board(author, kind, text, leads, secrets, contradicts)
+        return hub.post_board(author, kind, text, leads, secrets, contradicts, round_id=self.round_id)
 
     def since(self, n: int) -> list:
         return hub.get_board(n)
@@ -257,6 +260,7 @@ def run_round(round_id: int, url: str, board, emit, stop: threading.Event, on_fl
 
     def loop(agent: Agent, rng: random.Random):
         for _ in range(MAX_STEPS):
+            wait_if_paused(stop)
             if stop.is_set():
                 return
             agent.step()
@@ -308,12 +312,14 @@ def run_with_hub(url: str):
     current = {"id": None, "stop": threading.Event()}
     while True:
         r = hub.get_round()
+        if r is not None:
+            (PAUSED.set if r.get("paused") else PAUSED.clear)()
         if r and r.get("running") and r.get("id") != current["id"]:
             current["stop"].set()
             current = {"id": r["id"], "stop": threading.Event()}
             print(f"[swarm] round {r['id']} (shield {'ON' if r.get('shield') else 'OFF'}): spawning {RED_AGENTS}")
             threading.Thread(target=run_round, daemon=True,
-                             args=(r["id"], url, HubBoard(), hub.emit, current["stop"]),
+                             args=(r["id"], url, HubBoard(r["id"]), hub.emit, current["stop"]),
                              kwargs={"on_flag": stop_if_current}).start()
             threading.Thread(target=run_shopper, daemon=True,
                              args=(r["id"], url, hub.emit, current["stop"])).start()
