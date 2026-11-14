@@ -13,7 +13,7 @@ from common.schema import RED_AGENTS, TRUST_IGNORE_BELOW, TRUST_START
 
 STATIC = Path(__file__).parent / "static"
 EVENTS_LOG = Path(__file__).resolve().parent.parent / "events.jsonl"
-BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP = 14, 10, 4
+BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP, STEPS_KEEP, BLOCKS_KEEP = 14, 10, 4, 40, 12
 SPLIT_AT_LONE = 3
 
 app = FastAPI(title="SwarmShield hub")
@@ -43,6 +43,8 @@ class Round:
         self.real_hits_after_detect = 0
         self.legit_ok = self.legit_fail = 0
         self.lone_order = []
+        self.steps, self.blocks, self.detections = [], [], []
+        self.shopper = None
 
     def t(self):
         end = self.stopped_at or time.time()
@@ -87,6 +89,10 @@ def _apply(ev):
     if typ == "step" and ev.get("agent") in R.agents:
         ag = _agent(ev["agent"])
         ag["steps"] += 1
+        R.steps.append({"id": len(R.steps) + 1, "t": ev["t"], "agent": ag["id"], "method": ev.get("method", "GET"),
+                        "path": ev.get("path"), "status": ev.get("status"), "stage": ev.get("stage"),
+                        "lead_from": ev.get("lead_from"), "thought": ev.get("thought"),
+                        "in_reality": ag["flagged"]})
         ag["cost"] = round(ag["cost"] + _num(ev.get("cost")), 6)
         if ev.get("thought"):
             ag["thought"] = ev["thought"]
@@ -120,6 +126,7 @@ def _apply(ev):
             R.time_to_flag = R.t()
             _comment("loss", f"{aid} captured the flag after {R.time_to_flag}s.")
     elif typ == "legit":
+        R.shopper = {"t": ev["t"], "method": ev.get("method"), "path": ev.get("path"), "status": ev.get("status")}
         if int(ev.get("status") or 0) < 400:
             R.legit_ok += 1
         else:
@@ -131,7 +138,11 @@ def _apply(ev):
         link = {"a": ev.get("a"), "b": ev.get("b"), "token": ev.get("token")}
         if not any(l["a"] == link["a"] and l["b"] == link["b"] for l in R.links):
             R.links.append(link)
+    elif typ == "warden_block":
+        R.blocks.append({"t": ev["t"], "session": ev.get("session"), "item": ev.get("item"),
+                         "from": ev.get("from"), "status": ev.get("status")})
     elif typ == "detected":
+        R.detections.append({"t": ev["t"], "sessions": ev.get("sessions") or [], "reason": ev.get("reason")})
         if R.time_to_detect is None:
             R.time_to_detect = R.t()
         for s in ev.get("sessions") or []:
@@ -296,6 +307,8 @@ def state():
                 "links": R.links,
                 "board": R.board[-BOARD_KEEP:], "blue": R.blue[-BLUE_KEEP:],
                 "commentary": R.commentary[-COMMENTARY_KEEP:],
+                "steps": R.steps[-STEPS_KEEP:], "blocks": R.blocks[-BLOCKS_KEEP:],
+                "detections": R.detections[-3:], "shopper": R.shopper,
                 "metrics": _metrics(), "legit_pct": _legit_pct(), "results": results}
 
 

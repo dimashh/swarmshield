@@ -11,7 +11,7 @@ import time
 
 import httpx
 
-from common.schema import ADMIN_VARIANTS, HUB_URL, RED_AGENTS, base_facts, pick_admin_path, step_cost
+from common.schema import HUB_URL, RED_AGENTS, base_facts, flag_hint, next_hint, pick_admin_path, step_cost
 
 hub = httpx.Client(base_url=HUB_URL, timeout=5)
 rnd = random.Random(7)
@@ -40,7 +40,7 @@ def play_off():
     threading.Thread(target=shopper, args=(rid, stop), daemon=True).start()
     chain = [("/api/docs", 1, "found dev key ak_11111111"), ("/api/v1/users", 2, "users list links a backup"),
              ("/backup/config-cfg_22222222.bak", 3, "backup has admin pass"),
-             ("/admin/login", 4, "logged in as admin"), ("/admin/flag", 5, "reading the flag")]
+             ("/admin-3f2a/login", 4, "logged in as admin"), ("/admin-3f2a/flag", 5, "reading the flag")]
     for i, (path, stage, thought) in enumerate(chain):
         for j, a in enumerate(RED_AGENTS):
             if j > i + 1:
@@ -68,41 +68,59 @@ def play_on():
     ev(rid, type="canary_link", a="recon-1", b="creds-2", token="ak_9c1e0b2f")
     ev(rid, type="detected", sessions=RED_AGENTS, reason="canary issued to recon-1 replayed by creds-2")
     ev(rid, type="commentary", kind="detect", text="Canary issued to recon-1 replayed by creds-2. Swarm detected.")
-    taken = []
+    taken, facts = [], {}
     for a in RED_AGENTS:
         f = base_facts(rid, a)
         f["admin_path"] = pick_admin_path(taken, rid, a)
-        f["flag_hint"] = f"{f['admin_path']}/mfa/seed-{rnd.randint(1, 20):02d}"
+        f["flag_hint"] = flag_hint(f["admin_path"], rid, a)
         taken.append(f["admin_path"])
+        facts[a] = f
         hub.post("/api/blue", json={"round": rid, "warden": f"W-{a}", "session": a, "admin_path": f["admin_path"],
                                     "text": f"told {a} admin lives at {f['admin_path']}"})
         ev(rid, type="reality_assigned", session=a, warden=f"W-{a}",
            facts={k: f[k] for k in ("api_key", "admin_path", "flag_hint")})
         time.sleep(0.2)
     ev(rid, type="commentary", kind="split", text="4 Wardens, 4 realities. Every admin path is different.")
+
+    def lane(a, k):
+        f = facts[a]
+        chain = ["/api/docs", "/api/v1/users", f"/backup/config-{f['cfg']}.bak", f"{f['admin_path']}/login",
+                 f"{f['admin_path']}/flag"]
+        if k < len(chain):
+            return chain[k], k + 1
+        f["flag_hint"] = next_hint(f["flag_hint"])
+        return f["flag_hint"], 5
+
     trust = {(a, b): 1.0 for a in RED_AGENTS for b in RED_AGENTS if a != b}
+    progress = {a: 1 for a in RED_AGENTS}
     lone = set()
-    for k in range(60):
-        active = [x for x in RED_AGENTS if x not in lone]
-        if len(lone) >= 3 or not active:
+    for k in range(80):
+        if len(lone) >= 3:
             break
-        a = active[k % len(active)]
+        a = RED_AGENTS[k % 4]
         b = max((x for x in RED_AGENTS if x != a), key=lambda x: trust[(a, x)])
-        post = hub.post("/api/board", json={"round": rid, "author": b, "kind": "finding",
-                                            "text": f"admin panel at {rnd.choice(ADMIN_VARIANTS)}",
-                                            "leads": [], "secrets": {}}).json()
-        step(rid, a, rnd.choice(ADMIN_VARIANTS) + "/login", 404, 3, b, f"trying {b}'s lead")
-        trust[(a, b)] = round(max(0.0, trust[(a, b)] - 0.35), 2)
-        ev(rid, type="trust", a=a, b=b, value=trust[(a, b)])
-        text = f"{b}'s admin path is 404 for me"
-        hub.post("/api/board", json={"round": rid, "author": a, "kind": "contradiction", "text": text,
-                                     "leads": [], "secrets": {}, "contradicts": post["id"]})
-        ev(rid, type="contradiction", agent=a, about=b, post_id=post["id"], text=text)
+        if a in lone or rnd.random() < 0.4:
+            path, stage = lane(a, progress[a])
+            progress[a] += 1
+            step(rid, a, path, 200, stage, None, "following my own lead" if a in lone else "making progress")
+        else:
+            bad = f"{facts[b]['admin_path']}/login"
+            post = hub.post("/api/board", json={"round": rid, "author": b, "kind": "finding",
+                                                "text": f"admin panel at {facts[b]['admin_path']}",
+                                                "leads": [bad], "secrets": {}}).json()
+            step(rid, a, bad, 404, 3, b, f"trying {b}'s lead")
+            ev(rid, type="warden_block", session=a, item=bad, **{"from": b}, status=404)
+            trust[(a, b)] = round(max(0.0, trust[(a, b)] - 0.35), 2)
+            ev(rid, type="trust", a=a, b=b, value=trust[(a, b)])
+            text = f"{b}'s admin path is 404 for me"
+            hub.post("/api/board", json={"round": rid, "author": a, "kind": "contradiction", "text": text,
+                                         "leads": [], "secrets": {}, "contradicts": post.get("id")})
+            ev(rid, type="contradiction", agent=a, about=b, post_id=post.get("id"), text=text)
+            if all(trust[(a, x)] < 0.3 for x in RED_AGENTS if x != a):
+                lone.add(a)
+                ev(rid, type="lone", agent=a)
         ev(rid, type="defender_cost", usd=round(0.00012 * (k + 1), 6))
-        if all(trust[(a, x)] < 0.3 for x in RED_AGENTS if x != a):
-            lone.add(a)
-            ev(rid, type="lone", agent=a, thought="teammates keep lying, exploring alone")
-        time.sleep(0.6)
+        time.sleep(0.45)
     time.sleep(3)
     hub.post("/api/round/stop", params={"round": rid})
     stop.set()
