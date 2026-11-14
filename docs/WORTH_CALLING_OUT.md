@@ -35,6 +35,9 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 - **Shopper runs (swarm `swarm/legit.py`):** 30/30 legit requests OK through the gateway in a 30s Shield ON run (all `forward_legit`, never flagged). `legit_pct` is now backed by real traffic.
 - **Fixed:** two parallel requests from one newly flagged agent could build two Wardens for it (seen live for coord-4). Warden assignment is now serialised.
 
+- **Live rerun on the new dashboard (main after PR #3/#4/#5):** OFF flag at 15.5s; ON detect 6.7–6.8s, 4/4 in fake shops, 0 real hits after detection, 13–23 contradictions, only 1/4 lone after ~50s, no split; shopper 100% (56 ok / 0 fail).
+- **Late flag bug (fixed):** the swarm emits `flag_captured` then stops the round, so the flag could land after the stop and the OFF scorecard said SAFE.
+
 ## Red swarm (`swarm/run.py`, Graduate)
 
 - **The swarm is scripted, not an LLM.** Keyword scores pick the next lead and `tokens_in/out` and `cost` are simulated by `step_cost`. A real LLM swarm would reason about contradictions instead of applying fixed trust deltas.

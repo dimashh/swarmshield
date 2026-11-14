@@ -53,7 +53,28 @@ class Round:
 
 
 R = Round()
-last_id = 0
+
+
+def _last_logged_round():
+    """Continue round ids after a hub restart, so a running swarm doesn't take a new round for one it already played."""
+    try:
+        with EVENTS_LOG.open("rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 65536))
+            lines = f.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return 0
+    for line in reversed(lines):
+        try:
+            rid = json.loads(line).get("round")
+        except (ValueError, AttributeError):
+            continue
+        if isinstance(rid, int):
+            return rid
+    return 0
+
+
+last_id = _last_logged_round()
 results: list = []
 
 
@@ -296,6 +317,9 @@ def events(body=Body(...)):
             _log(ev)
             if R.running:
                 _apply(ev)
+            elif ev.get("type") == "flag_captured" and R.captured_by is None and results and results[-1]["round"] == R.id:
+                _apply(ev)  # winner's flag event can arrive just after its own round/stop
+                results[-1].update(flag=True, time_to_flag=R.time_to_flag)
     return {"ok": True}
 
 

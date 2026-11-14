@@ -4,6 +4,7 @@ One line per commit, newest first. Everyone commits to `main`: run `git pull --r
 
 - 2026-11-14 `hub`: `Optional[int]` instead of `int | None` so the hub starts on macOS's stock Python 3.9 (suite and all apps verified on 3.9) (Senior)
 - 2026-11-14 `common`: `hub.stop_round()` flushes queued events first, so `flag_captured` reaches the hub before the round closes (Shield OFF rounds were recording `flag: false`) (Senior)
+- 2026-11-14 `hub`: a winner's `flag_captured` that lands just after its own `round/stop` now counts (live OFF rounds showed SAFE); round ids continue from `events.jsonl` after a hub restart; map trusts gateway `request` events over swarm `step`s, one catch label at a time, caption counts lone agents (Product)
 - 2026-11-14 `hub`: merged PR #3 to `main` (hub API on :8000, live dashboard at `/`, `hub/fake_round.py` scripted backup round); `run_demo.sh` now uses the real hub instead of `shield/stubhub.py` (Product, merged by Senior)
 - 2026-11-14 `swarm`: legit shopper (`swarm/legit.py`) lists products and orders every `SHOPPER_EVERY_S` with the Bearer token, emits `legit`; `swarm.run` starts it each round; WORTH_CALLING_OUT shopper line updated (Graduate)
 - 2026-11-14 `docs`: WORTH_CALLING_OUT lone-rule line now gives the spread over 6 Shield ON runs (3+ lone in 3 of 6) instead of one run (Graduate)

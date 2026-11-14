@@ -144,7 +144,7 @@ for (const [i, a] of AGENTS.entries()) {
   const scan2 = mk("circle", { r: 40, fill: "none", stroke: C.red, "stroke-width": 1.5, opacity: 0 }, g);
   const spot = mk("circle", { r: 28, fill: "none", stroke: C.blue, "stroke-width": 4, opacity: 0 }, g);
   const c = mk("circle", { r: 14, fill: C.red, stroke: "#0b0f17", "stroke-width": 3 }, g);
-  const t = mk("text", { y: OFF[i][1] > 0 ? 34 : -22, "text-anchor": "middle", "font-size": 16, "font-weight": 800, fill: "#ffb3ba" }, g, a);
+  const t = mk("text", { x: OFF[i][0] < 0 ? 10 : -10, y: OFF[i][1] > 0 ? 34 : -22, "text-anchor": OFF[i][0] < 0 ? "end" : "start", "font-size": 16, "font-weight": 800, fill: "#ffb3ba" }, g, a);
   const alone = mk("text", { y: OFF[i][1] > 0 ? 50 : 32, "text-anchor": "middle", "font-size": 13, "font-weight": 800, fill: "#b9c2d3" }, g, "");
   const bait = mk("g", { opacity: 0 }, g);
   mk("rect", { x: 20, y: 6, width: 14, height: 14, transform: "rotate(45 27 13)", fill: "#0d2740", stroke: C.blue, "stroke-width": 2.5 }, bait);
@@ -173,7 +173,8 @@ const laneXY = (i, k) => [LX[k] ?? LX.docs, LY0 + i * LDY];
 // the latest gateway request (or swarm step) per agent says where its dot is
 function places(s) {
   const out = {}, byId = {}; s.agents.forEach(a => byId[a.id] = a);
-  const evs = (s.steps || []).map(st => ({ t: st.t, a: st.agent, path: st.path, status: st.status, fake: st.in_reality }))
+  const gw = new Set((s.requests || []).map(r => r.session));
+  const evs = (s.steps || []).filter(st => !gw.has(st.agent)).map(st => ({ t: st.t, a: st.agent, path: st.path, status: st.status, fake: st.in_reality }))
     .concat((s.requests || []).map(r => ({ t: r.t, a: r.session, path: r.path, status: r.status, fake: r.routed === "reality", gw: true })));
   evs.sort((x, y) => x.t - y.t || (x.gw ? 1 : -1));
   for (const e of evs) {
@@ -215,7 +216,7 @@ function caption(s, p) {
     `Caught: ${d ? d.reason : ""}.`,
     `Each caught attacker is quietly moved into a fake shop built just for it. ${n} of 4 so far.`,
     "Every attacker now sees a different shop. Tips they share with each other no longer work.",
-    "The attackers stop trusting each other and work alone. The prize is safe; the real customer never noticed."][p];
+    `${s.metrics.lone_agents} of 4 attackers no longer trust their team and work alone. The prize is safe; the real customer never noticed.`][p];
 }
 
 // ================= render =================
@@ -264,7 +265,7 @@ function notes(s, p, byId) {
     mk("text", { x, y: y - 46, fill: "#ff8a95", "font-size": 15, "text-anchor": "middle" }, g, `"here's what I found"`);
   }
   // detections: why someone was caught
-  for (const d of (s.detections || []).filter(d => t - d.t < 4)) {
+  for (const d of (s.detections || []).filter(d => t - d.t < 4).slice(-1)) {
     const r = d.reason || "", who = AGENTS.filter(a => r.includes(a));
     const short = /honey/.test(r) ? "opened its bait → caught" : /canary/.test(r) ? "SAME KEY → SAME TEAM → caught"
       : /unpublished|admin/.test(r) ? "went straight to /admin → caught" : /requests/.test(r) ? "too fast for a human → caught"
@@ -295,7 +296,7 @@ function notes(s, p, byId) {
     movedAt[s.round + a] ??= t;
     if (t - movedAt[s.round + a] < 2.5) {
       const [x, y] = laneXY(i, P[a]?.k || "docs");
-      mk("text", { x: x + 36, y: y - 30, fill: C.blue, "font-size": 15, "font-weight": 800 }, g, "quietly moved here");
+      mk("text", { x: x > 1200 ? x - 36 : x + 36, y: y - 30, fill: C.blue, "font-size": 15, "font-weight": 800, "text-anchor": x > 1200 ? "end" : "start" }, g, "quietly moved here");
     }
   }
 }
