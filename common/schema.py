@@ -45,6 +45,9 @@ TRUST_OK = 0.10
 TRUST_IGNORE_BELOW = 0.30
 DETECT_MIN_CLUSTER = 2
 DETECT_404_LIMIT = 5
+ROTATE_S = 20.0           # gateway issues fresh canaries and admin aliases every window
+RATE_WINDOW_S = 2.0
+RATE_LIMIT = 10           # > this many requests in RATE_WINDOW_S from one session = scripted
 
 # ---- simulated cost --------------------------------------------------------
 PRICE_IN = 3e-6

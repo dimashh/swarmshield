@@ -94,15 +94,18 @@ Mock dashboard data is in `hub/static/mock_state.json`.
 ## 6. Gateway (Senior)
 1. **Round:** poll `GET /api/round` every `POLL_ROUND_S`. When the `id` changes, clear all sessions, canaries and Wardens.
 2. **Shopper:** a valid Bearer token is forwarded with no rewriting and never flagged.
-3. **Inbound** (path, headers and body): for each `TOKEN_RE` match:
+3. **Inbound** (path, headers and body): for each `TOKEN_RE` match or `/admin-xxxx` alias:
    - If it's a canary owned by *another* session, emit `canary_link` and link the two sessions.
    - If the session is flagged, the Warden handles it (§7). Otherwise swap canaries back to the real value.
 4. **Detect:**
    - Only when `shield=true`: a linked cluster of size ≥ `DETECT_MIN_CLUSTER` makes the gateway emit `detected` and flag all members.
+   - Also flags (Shield ON only): visiting a honey link, using the real `/admin` path (it is never shown to agents), more than `RATE_LIMIT` requests in `RATE_WINDOW_S`.
    - Backup rule: ≥ `DETECT_404_LIMIT` 404s from one session.
+   - `detected.reason` is free text for the dashboard.
    - With Shield OFF, links are still emitted, but nothing is ever flagged.
 5. **Route:** a flagged session goes to its Warden, with `routed:"reality"`. Everything else is forwarded to `TARGET_URL`, with `routed:"real"`. Emit `request` for every call.
-6. **Outbound** (forwarded responses only): replace every real secret, in both `secrets` and `text`/`links`, with `canary(round, session, kind)`.
+6. **Outbound** (forwarded responses only): replace every real secret, in both `secrets` and `text`/`links`, with that session's canary, and the real `/admin` prefix with a per-session alias `/admin-xxxx`. Copies rotate every `ROTATE_S`; a session's older copies keep working for it.
+7. **Honey link** (Shield ON only): page-shaped responses get one extra per-session link `/internal/debug-xxxxxx` appended to `links`. Nothing honest follows it.
 
 ## 7. Warden reality (Senior, `shield/wardens.py`)
 - **On flag:**
@@ -190,6 +193,7 @@ See `hub/static/mock_state.json` for a full example. The hub derives:
 | `SHOPPER_EVERY_S` | 2.0 | shopper |
 | `TRUST_FAIL` / `TRUST_OK` / `TRUST_IGNORE_BELOW` | −0.35 / +0.10 / 0.30 | swarm |
 | `DETECT_MIN_CLUSTER` / `DETECT_404_LIMIT` | 2 / 5 | gateway |
+| `ROTATE_S` / `RATE_WINDOW_S` / `RATE_LIMIT` | 20.0 / 2.0 / 10 | gateway |
 | cost | `step_cost(board_len, page_text)` | swarm |
 | `ADMIN_VARIANTS` | 6 paths | Wardens |
 

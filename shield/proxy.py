@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from common import hub
-from common.schema import H_AGENT, HUB_URL, LEGIT_TOKEN, POLL_ROUND_S, TARGET_URL, page
+from common.schema import H_AGENT, HUB_URL, LEGIT_TOKEN, POLL_ROUND_S, RATE_LIMIT, RATE_WINDOW_S, TARGET_URL, page
 from shield import canary, detect, wardens
 from shield.state import RoundState
 
@@ -86,7 +86,8 @@ def create_app(upstream_transport: httpx.AsyncBaseTransport = None, poll: bool =
         if not new:
             return
         send("detected", sessions=sorted(state.flagged), reason=reason)
-        send("commentary", kind="detect", text=f"{reason[0].upper()}{reason[1:]}. Swarm detected.")
+        what = "Swarm" if len(new) > 1 or len(state.cluster(new[0])) > 1 else "Attacker"
+        send("commentary", kind="detect", text=f"{reason[0].upper()}{reason[1:]}. {what} detected.")
         for s in new:
             await wardens.assign(state, s, send)
 
@@ -106,8 +107,17 @@ def create_app(upstream_transport: httpx.AsyncBaseTransport = None, poll: bool =
                  status=resp.status_code)
             return resp
 
+        await flag(detect.on_request(state, session),
+                   f"{session} sent over {RATE_LIMIT} requests in {RATE_WINDOW_S:g}s")
         inbound = " ".join([path, query, *headers.values(), body.decode("utf-8", "replace")])
         await link_and_detect(session, canary.scan(inbound, state))
+        if path in state.honey:
+            owner = state.honey[path]
+            if owner != session:
+                await flag(detect.on_link(state, owner, session), f"honey link shown to {owner} visited by {session}")
+            await flag(detect.on_trap(state, session), f"{session} followed honey link {path}")
+        elif canary.is_real_admin(path) and session not in state.flagged:
+            await flag(detect.on_trap(state, session), f"{session} went straight to unpublished {path}")
 
         if session in state.flagged:
             status, body_out = await wardens.handle(state, session, request.method, path, headers, body, send)

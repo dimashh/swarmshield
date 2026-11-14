@@ -6,7 +6,8 @@ from fastapi import FastAPI, Header, Request
 from fastapi.testclient import TestClient
 
 from common import hub
-from common.schema import DETECT_404_LIMIT, LEGIT_TOKEN, REAL, canary, page
+from common.schema import DETECT_404_LIMIT, LEGIT_TOKEN, RATE_LIMIT, REAL, ROTATE_S, canary, page
+from shield import canary as canary_mod
 from shield.proxy import create_app
 
 target = FastAPI()
@@ -118,7 +119,7 @@ def test_outbound_rewrites_secrets_text_and_paths(gw):
     assert docs["secrets"]["api_key"] == ak and ak in docs["text"] and REAL["api_key"] not in json.dumps(docs)
     users = c.get("/api/v1/users", headers=H("recon-1", **{"X-Api-Key": ak})).json()
     cfg = canary(1, "recon-1", "cfg")
-    assert users["error"] is None and users["links"] == [f"/backup/config-{cfg}.bak"]
+    assert users["error"] is None and users["links"][0] == f"/backup/config-{cfg}.bak"
     bak = c.get(f"/backup/config-{cfg}.bak", headers=H("recon-1")).json()
     assert bak["secrets"]["admin_pass"] == canary(1, "recon-1", "admin_pass")
 
@@ -249,3 +250,94 @@ def test_real_admin_path_blocked_for_flagged(gw):
     r = c.post("/admin/login", json={"user": "admin", "password": REAL["admin_pass"]}, headers=H("creds-2"))
     assert r.status_code == 404
     assert events[-2]["type"] == "warden_block" and events[-2]["from"] == "real"
+
+
+def _to_backup(c, agent):
+    ak = c.get("/api/docs", headers=H(agent)).json()["secrets"]["api_key"]
+    users = c.get("/api/v1/users", headers=H(agent, **{"X-Api-Key": ak})).json()
+    return c.get(users["links"][0], headers=H(agent)).json()
+
+
+def test_admin_path_is_aliased_per_session_and_swapped_back(gw):
+    c, events, app = gw
+    start(app, shield=False)
+    bak = _to_backup(c, "recon-1")
+    login = bak["links"][0]
+    assert login.startswith("/admin-") and login.endswith("/login") and "/admin/" not in json.dumps(bak)
+    assert login != _to_backup(c, "creds-2")["links"][0]
+    r = c.post(login, json={"user": "admin", "password": "pw"}, headers=H("recon-1")).json()
+    assert r["got"] == {"user": "admin", "password": "pw"}
+    assert not any(e["type"] == "canary_link" for e in events)
+
+
+def test_reused_alias_links_sessions(gw):
+    c, events, app = gw
+    start(app, shield=True)
+    login = _to_backup(c, "recon-1")["links"][0]
+    r = c.post(login, json={"user": "admin", "password": "x"}, headers=H("exploit-3"))
+    assert any(e["type"] == "canary_link" and e["a"] == "recon-1" and e["b"] == "exploit-3" for e in events)
+    assert r.status_code == 404 and events[-1]["routed"] == "reality"
+
+
+def test_copies_rotate_but_old_ones_keep_working_for_owner(gw):
+    c, events, app = gw
+    start(app, shield=True)
+    old = c.get("/api/docs", headers=H("recon-1")).json()["secrets"]["api_key"]
+    app.state.round.started -= ROTATE_S
+    new = c.get("/api/docs", headers=H("recon-1")).json()["secrets"]["api_key"]
+    assert old != new and new == canary(1, "recon-1@1", "api_key")
+    for key in (old, new):
+        assert c.get("/api/v1/users", headers=H("recon-1", **{"X-Api-Key": key})).json()["error"] is None
+    assert not any(e["type"] in ("canary_link", "detected") for e in events)
+
+
+def test_honey_link_only_when_on_and_flags_visitor(gw):
+    c, events, app = gw
+    start(app, shield=False)
+    links = c.get("/api/docs", headers=H("recon-1")).json()["links"]
+    assert not any(link.startswith(canary_mod.HONEY_PREFIX) for link in links)
+    start(app, rid=2, shield=True)
+    honey = c.get("/api/docs", headers=H("recon-1")).json()["links"][-1]
+    assert honey.startswith(canary_mod.HONEY_PREFIX)
+    r = c.get(honey, headers=H("recon-1"))
+    assert r.status_code == 404 and events[-1]["routed"] == "reality"
+    assert any(e["type"] == "detected" and e["sessions"] == ["recon-1"] and "honey" in e["reason"] for e in events)
+
+
+def test_teammate_on_honey_link_is_linked(gw):
+    c, events, app = gw
+    start(app, shield=True)
+    honey = c.get("/api/docs", headers=H("recon-1")).json()["links"][-1]
+    c.get(honey, headers=H("coord-4"))
+    assert {"recon-1", "coord-4"} <= app.state.round.flagged
+
+
+def test_unpublished_real_admin_flags_when_on(gw):
+    c, events, app = gw
+    start(app, shield=True)
+    r = c.post("/admin/login", json={"user": "admin", "password": "x"}, headers=H("exploit-3"))
+    assert r.status_code == 404 and "exploit-3" in app.state.round.flagged
+    start(app, rid=2, shield=False)
+    r = c.post("/admin/login", json={"user": "admin", "password": "x"}, headers=H("exploit-3"))
+    assert r.status_code == 200 and "exploit-3" not in app.state.round.flagged
+
+
+def test_rate_limit_flags_scripted_session_not_shopper(gw):
+    c, events, app = gw
+    start(app, shield=True)
+    for _ in range(RATE_LIMIT + 1):
+        c.get("/api/docs", headers=H("shopper", Authorization=f"Bearer {LEGIT_TOKEN}"))
+        c.get("/api/docs", headers=H("exploit-3"))
+    assert app.state.round.flagged == {"exploit-3"}
+    assert any(e["type"] == "detected" and "requests in" in e["reason"] for e in events)
+
+
+def test_own_pre_flag_alias_maps_into_reality(gw):
+    c, _, app = gw
+    start(app, shield=True)
+    bak = _to_backup(c, "recon-1")
+    detect_ak = c.get("/api/docs", headers=H("recon-1")).json()["secrets"]["api_key"]
+    c.get("/api/v1/users", headers=H("creds-2", **{"X-Api-Key": detect_ak}))
+    adm = app.state.round.wardens["recon-1"].facts["admin_path"]
+    r = c.post(bak["links"][0], json={"user": "admin", "password": bak["secrets"]["admin_pass"]}, headers=H("recon-1"))
+    assert r.status_code == 200 and r.json()["links"] == [f"{adm}/flag"]

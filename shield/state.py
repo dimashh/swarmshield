@@ -1,5 +1,6 @@
 """Per-round gateway state. Everything is cleared when the hub's round id changes."""
-from collections import Counter
+import time
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 
 
@@ -7,7 +8,10 @@ from dataclasses import dataclass, field
 class RoundState:
     id: int = 0
     shield: bool = False
-    issued: dict = field(default_factory=dict)      # canary token -> (owner session, kind)
+    started: float = field(default_factory=time.monotonic)
+    issued: dict = field(default_factory=dict)      # canary token or admin alias -> (owner session, kind)
+    honey: dict = field(default_factory=dict)       # honey path -> session it was shown to
+    hits: defaultdict = field(default_factory=lambda: defaultdict(deque))  # session -> recent request times
     parent: dict = field(default_factory=dict)      # union-find over linked sessions
     links: set = field(default_factory=set)         # (owner, reuser, token) already emitted
     flagged: set = field(default_factory=set)

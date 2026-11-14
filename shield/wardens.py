@@ -5,8 +5,9 @@ import time
 from dataclasses import dataclass
 
 from common import hub
-from common.schema import (DEFENDER_COST_PER_REALITY_PAGE, HINT_RE, REAL, base_facts, canary, flag_hint,
-                           next_hint, page, pick_admin_path)
+from common.schema import (DEFENDER_COST_PER_REALITY_PAGE, HINT_RE, REAL, base_facts, flag_hint, next_hint, page,
+                           pick_admin_path)
+from shield.canary import ALIAS_RE
 
 KINDS = ("api_key", "cfg", "admin_pass", "admin_token")
 REAL_ADMIN = "/admin"
@@ -34,14 +35,19 @@ class Warden:
         return f"W-{self.session}"
 
     def accepts(self, state, kind: str, value: str) -> bool:
-        """Own facts, plus this session's own pre-flag canary so its reality doesn't break on flag."""
-        return value in (self.facts[kind], canary(state.id, self.session, kind))
+        """Own facts, plus this session's own pre-flag canaries so its reality doesn't break on flag."""
+        return value == self.facts[kind] or state.issued.get(value) == (self.session, kind)
 
 
 def owner_of(state, item: str):
     """Who an inbound secret or path really belongs to: a session, "real", or None."""
     if item in state.issued:
         return state.issued[item][0]
+    if item in state.honey:
+        return state.honey[item]
+    m = ALIAS_RE.match(item)
+    if m and m.group(0) in state.issued:
+        return state.issued[m.group(0)][0]
     if item in REAL.values() or item.startswith(REAL_ADMIN + "/"):
         return "real"
     for w in state.wardens.values():
@@ -82,6 +88,9 @@ async def handle(state, session: str, method: str, path: str, headers: dict, bod
     w = state.wardens.get(session) or await assign(state, session, send)
     _cost(state, send)
     f, adm = w.facts, w.facts["admin_path"]
+    m = ALIAS_RE.match(path)
+    if m and state.issued.get(m.group(0), (None,))[0] == session:
+        path = adm + path[m.end():]
 
     def block(status: int, error: str, item: str):
         send("warden_block", session=session, item=item, status=status, **{"from": owner_of(state, item)})
