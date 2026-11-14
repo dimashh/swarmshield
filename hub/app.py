@@ -282,11 +282,12 @@ def events(body=Body(...)):
         for ev in evs:
             if not isinstance(ev, dict):
                 continue
-            if not R.running or _stale(ev.get("round")):
+            if _stale(ev.get("round")):
                 continue
             ev["t"] = R.t()
             _log(ev)
-            _apply(ev)
+            if R.running:
+                _apply(ev)
     return {"ok": True}
 
 
