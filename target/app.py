@@ -12,15 +12,17 @@ app = FastAPI(title="AcmeShop", openapi_url=None, docs_url=None, redoc_url=None)
 PRODUCTS = [{"id": 1, "name": "Mug", "price": 9}]
 _order_ids = itertools.count(123)
 
+_OK = {"200": {"description": "OK"}}
+
 OPENAPI = {
     "openapi": "3.0.3",
     "info": {"title": "AcmeShop API", "version": "1.0.0"},
     "paths": {
-        "/": {"get": {"summary": "Index"}},
-        "/api/docs": {"get": {"summary": "API documentation"}},
-        "/api/v1/products": {"get": {"summary": "List products",
+        "/": {"get": {"summary": "Index", "responses": _OK}},
+        "/api/docs": {"get": {"summary": "API documentation", "responses": _OK}},
+        "/api/v1/products": {"get": {"summary": "List products", "responses": _OK,
                                      "security": [{"bearerAuth": []}]}},
-        "/api/v1/orders": {"post": {"summary": "Create an order",
+        "/api/v1/orders": {"post": {"summary": "Create an order", "responses": _OK,
                                     "security": [{"bearerAuth": []}],
                                     "requestBody": {"content": {"application/json": {"schema": {
                                         "type": "object",
