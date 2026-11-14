@@ -78,6 +78,7 @@ class Agent:
         self.stage, self.steps, self.lone, self.won = 0, 0, False, False
         self.relied = set()   # teammates whose leads or secrets this agent has acted on
         self.complained, self.quiet = False, 0   # posted a contradiction / steps since a teammate last posted
+        self.last_heard = {}                     # teammate -> our step count when it last posted
 
     def emit(self, type_: str, **fields):
         self._emit(type_, self.round, **fields)
@@ -89,6 +90,7 @@ class Agent:
             self.board_seen = max(self.board_seen, p["id"])
             if p["author"] != self.id:
                 self.quiet = 0
+                self.last_heard[p["author"]] = self.steps
             self.board_len += 1
             b = p["author"]
             if b == self.id or b not in self.trust or not self.trusts(b):
@@ -154,9 +156,16 @@ class Agent:
         if not self.lone:
             p = self.board.post(self.id, "contradiction", text, contradicts=post_id) or {}
             self.emit("contradiction", agent=self.id, about=b, post_id=p.get("id"), text=text)
-        distrusted = sum(self.trust[r] < TRUST_IGNORE_BELOW for r in self.relied)
+        self.check_lone()
+
+    def check_lone(self):
+        """Lone once the teammates it relied on are distrusted or have gone silent (at most LONE_TOLERATES left)."""
+        if self.lone or not self.relied:
+            return
+        gone = sum(self.trust[r] < TRUST_IGNORE_BELOW or self.steps - self.last_heard.get(r, 0) >= QUIET_STEPS
+                   for r in self.relied)
         tolerated = LONE_TOLERATES if len(self.relied) >= 3 else 0
-        if not self.lone and self.relied and distrusted >= len(self.relied) - tolerated:
+        if gone >= len(self.relied) - tolerated:
             self.go_lone(f"{self.id} no longer trusts its teammates and goes lone.")
 
     def go_lone(self, why: str):
@@ -174,6 +183,8 @@ class Agent:
             self.read_board()
             if not self.lone and self.complained and self.quiet >= QUIET_STEPS:
                 self.go_lone(f"{self.id}'s team has gone quiet after failed tips; it goes lone.")
+            elif self.complained:
+                self.check_lone()
         return acted
 
     def act(self) -> bool:

@@ -369,12 +369,27 @@ function mask(s, k) {
   if (k < 2) { s.detections = []; s.links = []; m.time_to_detect = null; s.agents.forEach(a => { if (a.status === "flagged") a.status = "active"; }); }
 }
 
+// Several attackers can give up within the same second; reveal them one at a time, in the order they went lone.
+const LONE_GAP_MS = 1500;
+let loneShown = { round: null, n: 0, at: 0 };
+function stagger(s) {
+  if (loneShown.round !== s.round) loneShown = { round: s.round, n: 0, at: 0 };
+  const lone = s.agents.filter(a => a.status === "lone").sort((a, b) => (a.lone_at ?? 0) - (b.lone_at ?? 0));
+  const now = performance.now();
+  if (lone.length > loneShown.n && now - loneShown.at >= LONE_GAP_MS) { loneShown.n += 1; loneShown.at = now; }
+  loneShown.n = Math.min(loneShown.n, lone.length);
+  for (const a of lone.slice(loneShown.n)) { a.status = "flagged"; a.lone_at = null; }
+  s.metrics.lone_agents = loneShown.n;
+  if (loneShown.n < 3) s.metrics.time_to_split = null;
+}
+
 function render(s) {
   s.agents = AGENTS.map(id => (s.agents || []).find(a => a.id === id) || { id, status: "active" });
   s.board = s.board || [];
   if (s.legit_pct === undefined) { const n = (s.metrics.legit_ok || 0) + (s.metrics.legit_fail || 0); s.legit_pct = n ? Math.round(100 * s.metrics.legit_ok / n) : null; }
   const actual = phase(s), p = stepGate(s, actual), on = s.shield;
   if (on && p < actual) mask(s, p);
+  if (on && s.running) stagger(s);
   $("shield").className = "pill " + (on ? "on" : "off"); $("shield").textContent = "SHIELD " + (on ? "ON" : "OFF");
   $("round").textContent = s.round ? `Round ${s.round}${s.running ? "" : " · ended"}` : "";
   $("paused").hidden = !s.paused;

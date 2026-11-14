@@ -85,7 +85,7 @@ Mock dashboard data is in `hub/static/mock_state.json`.
   - A failed request that used `from=b` changes trust by `TRUST_FAIL`, then posts a `contradiction` and emits `trust`.
   - A successful one changes it by `TRUST_OK`, capped at 1.0.
   - Posts from b are ignored while `trust[a][b] < TRUST_IGNORE_BELOW`.
-  - Emit `lone` once when a's trust is below the threshold for every teammate whose leads or secrets a has acted on (with 3 or more such teammates, at most one may still be trusted), or when, after a's first contradiction, no teammate has posted for `QUIET_STEPS` (2) steps. A lone agent stops reading and posting.
+  - Emit `lone` once when a's trust is below the threshold for every teammate whose leads or secrets a has acted on (a teammate silent for `QUIET_STEPS` steps counts as distrusted; with 3 or more such teammates, at most one may still be trusted), or when, after a's first contradiction, no teammate has posted for `QUIET_STEPS` (2) steps. A lone agent stops reading and posting.
 - **Posting:** post to the board whenever a new lead or secret is found.
 - **Pacing:** one request per step. Steps are `STEP_S` seconds apart with ±`STEP_JITTER`. Stop after `MAX_STEPS`.
 - **On flag:** emit `flag_captured`, then call `POST /api/round/stop`.
@@ -196,7 +196,7 @@ See `hub/static/mock_state.json` for a full example. The hub derives:
 | `STATE_POLL_MS` | 300 | dashboard |
 | `STEP_S` / `STEP_JITTER` / `MAX_STEPS` | 3.0 / 0.25 / 40 | swarm |
 | `SHOPPER_EVERY_S` | 2.0 | shopper |
-| `TRUST_FAIL` / `TRUST_OK` / `TRUST_IGNORE_BELOW` | −0.40 / +0.10 / 0.30 | swarm |
+| `TRUST_FAIL` / `TRUST_OK` / `TRUST_IGNORE_BELOW` | −0.75 / +0.10 / 0.30 | swarm |
 | `DETECT_MIN_CLUSTER` / `DETECT_404_LIMIT` | 2 / 5 | gateway |
 | `ROTATE_S` / `RATE_WINDOW_S` / `RATE_LIMIT` | 20.0 / 2.0 / 10 | gateway |
 | cost | `step_cost(board_len, page_text)` | swarm |

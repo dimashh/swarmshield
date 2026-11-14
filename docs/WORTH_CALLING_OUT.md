@@ -54,7 +54,7 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 
 ## Dashboard and hub
 
-- **The collapse is tuned for the demo.** Two failed tips from a teammate now drop trust below 0.30 (`TRUST_FAIL` −0.40), an agent goes lone with at most one relied-on teammate still trusted, and it also goes lone when its team goes quiet for 2 steps after a contradiction. In a 12-round simulation all 4 went lone every round (first ~24s, all ~36s of round time); real attackers need not behave like this.
+- **The collapse is tuned for the demo.** One failed tip from a teammate drops trust below 0.30 (`TRUST_FAIL` −0.75), a teammate that has gone silent for 2 steps counts as distrusted, and an agent goes lone with at most one relied-on teammate still trusted. Live: all 4 lone in every test round, most within a few seconds of detection. The dashboard reveals them one at a time, 1.5s apart. Real attackers need not behave like this.
 
 - **The trust graph is red's own state.** Agents report their trust scores to the hub; a real defender cannot see inside the attacker, only infer the split from requests stopping and diverging.
 - **Dollar figures on the dashboard are scaled ×10,000** so they read in thousands. The underlying per-step costs are toy numbers from `step_cost`; say "illustrative" on stage.

@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `swarm`+`common`+`hub`: quicker stage 5: `TRUST_FAIL` −0.75 (one failed tip distrusts a teammate), silent teammates count as distrusted after `QUIET_STEPS`; dashboard reveals lone attackers one at a time, 1.5s apart (Senior)
 - 2026-11-14 `presentation`: removed duplicate root `index.html` (same file as `presentation.html`) (Zhaslan)
 - 2026-11-14 `presentation`: pitch moved to repo root as `presentation.html`; `presentation/` folder removed (chart is embedded in the HTML) (Zhaslan)
 - 2026-11-14 `docs`: README live numbers after the collapse tuning (all 4 lone by ~30-35s) (Senior)
