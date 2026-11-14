@@ -4,6 +4,7 @@ import math
 import threading
 import time
 from pathlib import Path
+from typing import Optional
 
 from fastapi import Body, FastAPI
 from fastapi.responses import FileResponse
@@ -215,7 +216,7 @@ def _stale(rid):
 
 
 @app.post("/api/round/{mode}")
-def round_ctl(mode: str, round: int | None = None):
+def round_ctl(mode: str, round: Optional[int] = None):
     global R, last_id
     with lock:
         if mode == "stop":
