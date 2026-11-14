@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `docs`: `docs/PRESENTATION_MATERIAL.md`, problem-statement sources for the slides (Transluce agent-activity report: facts, quotes, caveats, mapping to SwarmShield) (Senior)
 - 2026-11-14 `shield`: `run_demo.sh` (hub, target, gateway, swarm; stand-in `shield/stubhub.py` until `hub/app.py` lands; logs in `logs/`), `python -m shield.rehearse` scripted swarm reports detect time/real hits/shopper/trust for OFF and ON (Senior)
 - 2026-11-14 `shield`: per-session `/admin-xxxx` aliases, canaries and aliases rotate every `ROTATE_S` (owner's old copies still work), Shield ON adds a honey link to pages and flags honey visits, direct `/admin` use and > `RATE_LIMIT` req/`RATE_WINDOW_S`; `docs/WORTH_CALLING_OUT.md`; gateway+real-target integration tests (Senior)
 - 2026-11-14 `target`: AcmeShop toy target `target/app.py` on :9000 (kill chain `/` -> `/api/docs` -> `/api/v1/users` -> backup cfg -> `POST /admin/login` -> `/admin/flag`, shopper products/orders; all errors 401/403/404 in `page()` shape) (Graduate)
