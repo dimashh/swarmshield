@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `hub`: dashboard served with `Cache-Control: no-store`; shows "HUB IS OUTDATED · restart ./run_demo.sh" when the hub predates pause support (Senior)
 - 2026-11-14 `hub`: dashboard step mode (default): the round pauses as each stage begins, `N`/→ moves on; `A` toggles auto (no stage pauses), remembered per browser (Senior)
 - 2026-11-14 `hub`: Warden boxes only pop when spawned live, not on page refresh (Senior)
 - 2026-11-14 `hub`: simpler dashboard: live API view (attackers + real customer → gateway/Sentinel → real API tiles, Wardens spawn as fake APIs and each caught attacker's dot moves inside its own), swarm detection graph, plain-words Warden activity feed; $ shown ×10,000; hub `requests` now include shopper traffic (Senior)
