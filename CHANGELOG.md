@@ -2,6 +2,12 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `docs`: WORTH_CALLING_OUT lone-rule line now gives the spread over 6 Shield ON runs (3+ lone in 3 of 6) instead of one run (Graduate)
+- 2026-11-14 `swarm`: only the first agent to land the flag emits `flag_captured` when two land it in the same instant (Graduate)
+- 2026-11-14 `swarm`: `lone` once every teammate the agent relied on (acted on their leads/secrets) is below `TRUST_IGNORE_BELOW`, not all three (3 lone by about 22s with Shield ON); CONTRACTS §5 and WORTH_CALLING_OUT updated (Graduate)
+- 2026-11-14 `swarm`: flag capture retries the hub round stop while the hub is unreachable (Graduate)
+- 2026-11-14 `swarm`: round loop is bounded by `MAX_STEPS` step slots (idle agents no longer hang `--local`); results arriving after a round ends are dropped and only the current round is stopped on a late flag (Graduate)
+- 2026-11-14 `swarm`: red swarm `swarm/run.py` (4 agents per hub round via `common/hub.py`, links/leads/secrets only, keyword scores, follows `/admin-xxxx` aliases and honey links as received, directed trust + `contradiction`/`lone`, `flag_captured` then round stop; `--local` runs against the target with no hub), `tests/test_swarm.py`, swarm gaps in `docs/WORTH_CALLING_OUT.md` (Graduate)
 - 2026-11-14 `docs`: WORTH_CALLING_OUT integration rerun with latest swarm (4/4 lone, split 35.8s, detect 7.6s; shopper missing so legit 100% is 0/0) (Senior)
 - 2026-11-14 `shield`: fix double Warden assignment under concurrent requests; integration findings (detect 7.8s, no split yet) in WORTH_CALLING_OUT (Senior)
 - 2026-11-14 `shield`: detection is now the named **Sentinel** (`shield/detect.py` -> `shield/sentinel.py`); every alert is posted to the blue board as `warden:"Sentinel"` (`admin_path:null`) before the Wardens post, plus `Sentinel:` commentary (Senior)

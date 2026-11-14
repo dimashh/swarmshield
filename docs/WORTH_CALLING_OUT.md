@@ -35,6 +35,15 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 - **Shopper not running yet:** `legit_ok`/`legit_fail` are 0/0 but the hub reports `legit_pct` 100. Don't quote "100% legit" until the shopper runs.
 - **Fixed:** two parallel requests from one newly flagged agent could build two Wardens for it (seen live for coord-4). Warden assignment is now serialised.
 
+## Red swarm (`swarm/run.py`, Graduate)
+
+- **The swarm is scripted, not an LLM.** Keyword scores pick the next lead and `tokens_in/out` and `cost` are simulated by `step_cost`. A real LLM swarm would reason about contradictions instead of applying fixed trust deltas.
+- **Agents trust teammates first.** They try the newest teammate secret before their own, which is what makes canaries travel. A swarm that prefers its own values would be linked later or only by the honey/`/admin`/404 rules.
+- **Lone means "burned by everyone I relied on", not by all three teammates.** Followers that only reuse others' finds never post a failing tip, so under the original rule nobody went lone. Now an agent goes lone once every teammate whose leads or secrets it acted on is below 0.30 (6 Shield ON runs with the stand-in hub: 3+ lone in 3 of them, 3rd lone at 13.2s, 22.4s and 35.8s; the other 3 had only 0-1 lone after 30-40s, because a teammate whose secrets already failed rarely posts enough new ones to fail 3 times). It never counts teammates it hasn't tried.
+- **No second-hand distrust.** An agent lowers trust only from its own failed requests, never from a teammate's `contradiction` post. Gossip would make the split faster but is not in the contract.
+- **Agents don't revisit pages.** After `ROTATE_S` they keep using the copies they already have (still valid for them), so rotation shows up only through newly visited pages.
+- **Detection time depends on the swarm's order.** The first canary replay happens when the second agent uses the first one's key (about 6-10s), above the plan's < 5s.
+
 ## Scope of the demo
 
 - **Synthetic, local sandbox only.** Fixed secrets and a fake flag on localhost. Nothing touches real systems.
