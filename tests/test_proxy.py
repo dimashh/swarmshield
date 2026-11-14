@@ -5,6 +5,7 @@ import pytest
 from fastapi import FastAPI, Header, Request
 from fastapi.testclient import TestClient
 
+from common import hub
 from common.schema import DETECT_404_LIMIT, LEGIT_TOKEN, REAL, canary, page
 from shield.proxy import create_app
 
@@ -38,6 +39,15 @@ def products(authorization: str = Header(None)):
 @target.post("/admin/login")
 async def login(request: Request):
     return {"got": await request.json(), "q": dict(request.query_params)}
+
+
+@pytest.fixture(autouse=True)
+def fake_blue(monkeypatch):
+    posts = []
+    monkeypatch.setattr(hub, "get_blue", lambda: list(posts))
+    monkeypatch.setattr(hub, "post_blue", lambda warden, session, admin_path, text, facts=None: posts.append(
+        {"warden": warden, "session": session, "admin_path": admin_path, "text": text}))
+    return posts
 
 
 @pytest.fixture
@@ -123,7 +133,8 @@ def test_reused_canary_links_and_detects_when_on(gw):
     assert {"type": "detected", "sessions": ["creds-2", "recon-1"],
             "reason": "canary issued to recon-1 replayed by creds-2"} in events
     assert "commentary" in types
-    assert events[-1]["routed"] == "reality" and r.status_code == 404
+    assert events[-1]["routed"] == "reality" and r.status_code == 401 and r.json()["error"] == "invalid api key"
+    assert {"type": "warden_block", "session": "creds-2", "item": ak, "from": "recon-1", "status": 401} in events
     c.get("/api/docs", headers=H("recon-1"))
     assert events[-1]["routed"] == "reality"
 
@@ -168,3 +179,73 @@ def test_new_round_clears_canaries(gw):
     start(app, rid=2)
     c.get("/api/v1/users", headers=H("creds-2", **{"X-Api-Key": ak}))
     assert not any(e["type"] == "canary_link" for e in events)
+
+
+def _detect(c, app):
+    start(app, shield=True)
+    ak = c.get("/api/docs", headers=H("recon-1")).json()["secrets"]["api_key"]
+    c.get("/api/v1/users", headers=H("creds-2", **{"X-Api-Key": ak}))
+    return ak
+
+
+def _walk(c, agent, key=None):
+    """Follow one session's own reality to the end. Returns the pages seen."""
+    docs = c.get("/api/docs", headers=H(agent)).json()
+    key = key or docs["secrets"]["api_key"]
+    users = c.get("/api/v1/users", headers=H(agent, **{"X-Api-Key": key})).json()
+    bak = c.get(users["links"][0], headers=H(agent)).json()
+    login = c.post(bak["links"][0], json={"user": "admin", "password": bak["secrets"]["admin_pass"]},
+                   headers=H(agent)).json()
+    flag = c.get(login["links"][0], headers=H(agent, **{"X-Admin-Token": login["secrets"]["admin_token"]})).json()
+    hint = c.get(flag["links"][0], headers=H(agent)).json()
+    return docs, users, bak, login, flag, hint
+
+
+def test_reality_is_consistent_and_never_gives_flag(gw, fake_blue):
+    c, events, app = gw
+    _detect(c, app)
+    docs, users, bak, login, flag, hint = _walk(c, "creds-2")
+    w = app.state.round.wardens["creds-2"]
+    adm = w.facts["admin_path"]
+    assert docs["secrets"]["api_key"] == w.facts["api_key"]
+    assert bak["links"] == [f"{adm}/login"] and login["links"] == [f"{adm}/flag"]
+    assert flag["flag"] is None and flag["links"] == [w.facts["flag_hint"]] and "migrated" in flag["text"]
+    assert hint["flag"] is None and hint["links"][0].startswith(f"{adm}/mfa/seed-")
+    assert not any(e["type"] == "request" and e["session"] in ("recon-1", "creds-2") and e["routed"] == "real"
+                   and events.index(e) > next(i for i, x in enumerate(events) if x["type"] == "detected")
+                   for e in events)
+    assert any(e["type"] == "reality_assigned" and e["session"] == "creds-2" and e["facts"]["admin_path"] == adm
+               for e in events)
+    assert any(e["type"] == "defender_cost" for e in events)
+
+
+def test_own_pre_flag_canary_still_works(gw):
+    c, _, app = gw
+    ak = _detect(c, app)
+    users = c.get("/api/v1/users", headers=H("recon-1", **{"X-Api-Key": ak}))
+    assert users.status_code == 200 and users.json()["error"] is None
+
+
+def test_realities_differ_and_cross_reality_fails(gw, fake_blue):
+    c, events, app = gw
+    _detect(c, app)
+    wardens = app.state.round.wardens
+    assert wardens["recon-1"].facts["admin_path"] != wardens["creds-2"].facts["admin_path"]
+    assert {p["admin_path"] for p in fake_blue} == {w.facts["admin_path"] for w in wardens.values()}
+    r_docs, _, r_bak, r_login, _, _ = _walk(c, "recon-1")
+    r = c.post(r_bak["links"][0], json={"user": "admin", "password": r_bak["secrets"]["admin_pass"]},
+               headers=H("creds-2"))
+    assert r.status_code == 404
+    assert events[-1] == {"type": "request", "session": "creds-2", "method": "POST", "path": r_bak["links"][0],
+                          "routed": "reality", "status": 404}
+    assert any(e["type"] == "warden_block" and e["from"] == "recon-1" for e in events)
+    r = c.get("/api/v1/users", headers=H("creds-2", **{"X-Api-Key": r_docs["secrets"]["api_key"]}))
+    assert r.status_code == 401
+
+
+def test_real_admin_path_blocked_for_flagged(gw):
+    c, events, app = gw
+    _detect(c, app)
+    r = c.post("/admin/login", json={"user": "admin", "password": REAL["admin_pass"]}, headers=H("creds-2"))
+    assert r.status_code == 404
+    assert events[-2]["type"] == "warden_block" and events[-2]["from"] == "real"

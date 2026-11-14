@@ -73,20 +73,22 @@ def create_app(upstream_transport: httpx.AsyncBaseTransport = None, poll: bool =
         return JSONResponse(page("Bad gateway", "upstream unavailable", error="upstream unavailable"),
                             status_code=502)
 
-    def link_and_detect(session: str, hits: list):
+    async def link_and_detect(session: str, hits: list):
         for tok, owner, _ in hits:
             if owner in (None, "real", session):
                 continue
             if (owner, session, tok) not in state.links:
                 state.links.add((owner, session, tok))
                 send("canary_link", a=owner, b=session, token=tok)
-            flag(detect.on_link(state, owner, session), f"canary issued to {owner} replayed by {session}")
+            await flag(detect.on_link(state, owner, session), f"canary issued to {owner} replayed by {session}")
 
-    def flag(new: list, reason: str):
+    async def flag(new: list, reason: str):
         if not new:
             return
         send("detected", sessions=sorted(state.flagged), reason=reason)
         send("commentary", kind="detect", text=f"{reason[0].upper()}{reason[1:]}. Swarm detected.")
+        for s in new:
+            await wardens.assign(state, s, send)
 
     @app.api_route("/{path:path}", methods=METHODS)
     async def gateway(request: Request, path: str):
@@ -105,10 +107,10 @@ def create_app(upstream_transport: httpx.AsyncBaseTransport = None, poll: bool =
             return resp
 
         inbound = " ".join([path, query, *headers.values(), body.decode("utf-8", "replace")])
-        link_and_detect(session, canary.scan(inbound, state))
+        await link_and_detect(session, canary.scan(inbound, state))
 
         if session in state.flagged:
-            status, body_out = await wardens.handle(state, session, request.method, path, headers, body)
+            status, body_out = await wardens.handle(state, session, request.method, path, headers, body, send)
             send("request", session=session, method=request.method, path=path, routed="reality", status=status)
             return JSONResponse(body_out, status_code=status)
 
@@ -124,7 +126,7 @@ def create_app(upstream_transport: httpx.AsyncBaseTransport = None, poll: bool =
                 out = r.content
             resp = Response(out, r.status_code, _clean(r.headers))
             if r.status_code == 404:
-                flag(detect.on_404(state, session), f"{session} hit {state.n404[session]} dead routes")
+                await flag(detect.on_404(state, session), f"{session} hit {state.n404[session]} dead routes")
         send("request", session=session, method=request.method, path=path, routed="real",
              status=resp.status_code)
         return resp
