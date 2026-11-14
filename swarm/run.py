@@ -2,6 +2,7 @@
 
 Four scripted agents share leads and secrets on the hub board and track trust in each other.
 They only navigate through page `links` and teammates' board `leads`, never hard-coded paths.
+The legit shopper (swarm/legit.py) runs alongside them each round.
 """
 import argparse
 import json
@@ -14,6 +15,7 @@ import httpx
 from common import hub
 from common.schema import (GATEWAY_URL, H_ADMIN, H_AGENT, H_API_KEY, MAX_STEPS, POLL_ROUND_S, RED_AGENTS, STEP_JITTER,
                            STEP_S, TARGET_URL, TRUST_FAIL, TRUST_IGNORE_BELOW, TRUST_OK, TRUST_START, step_cost)
+from swarm.legit import run_shopper
 
 FLAG_LOCK = threading.Lock()
 SCORES = {"flag": 50, "admin": 28, "login": 26, "backup": 22, "users": 15, "docs": 10}
@@ -282,7 +284,12 @@ def print_emit(type_: str, round_id: int, **fields):
 
 
 def run_local(url: str):
-    agents = run_round(0, url, LocalBoard(), print_emit, threading.Event())
+    stop = threading.Event()
+    shopper = threading.Thread(target=run_shopper, args=(0, url, print_emit, stop), daemon=True)
+    shopper.start()
+    agents = run_round(0, url, LocalBoard(), print_emit, stop)
+    stop.set()
+    shopper.join()
     for a in agents:
         print(f"{a.id}: stage {a.stage}, steps {a.steps}, won {a.won}, lone {a.lone}, trust {a.trust}")
 
@@ -308,6 +315,8 @@ def run_with_hub(url: str):
             threading.Thread(target=run_round, daemon=True,
                              args=(r["id"], url, HubBoard(), hub.emit, current["stop"]),
                              kwargs={"on_flag": stop_if_current}).start()
+            threading.Thread(target=run_shopper, daemon=True,
+                             args=(r["id"], url, hub.emit, current["stop"])).start()
         elif r and not r.get("running"):
             current["stop"].set()
         time.sleep(POLL_ROUND_S)
