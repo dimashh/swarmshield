@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `swarm`+`common`: faster, complete collapse in stage 5: `TRUST_FAIL` −0.40 (2 failures distrust a teammate), lone with at most 1 of 3+ relied teammates still trusted, or when the team goes quiet for `QUIET_STEPS`=2 after a contradiction; all 4 lone in 12/12 simulated rounds; CONTRACTS §5/§11 updated (Senior)
 - 2026-11-14 `docs`: README rewritten: quick start (Mac, Python 3.9+), dashboard keys and step mode, how it works (canaries, Sentinel, Wardens, trust collapse, real customer), ports/owners, tests, troubleshooting, docs index, workflow (Senior)
 - 2026-11-14 `hub`: step mode shows one stage at a time: while held on a stage, the dashboard hides what belongs to later stages (Wardens, rejected tips, lone agents), since stages 2-4 can land within a second (Senior)
 - 2026-11-14 `hub`: dashboard served with `Cache-Control: no-store`; shows "HUB IS OUTDATED · restart ./run_demo.sh" when the hub predates pause support (Senior)

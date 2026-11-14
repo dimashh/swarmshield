@@ -18,6 +18,8 @@ from common.schema import (GATEWAY_URL, H_ADMIN, H_AGENT, H_API_KEY, MAX_STEPS, 
 from swarm.legit import PAUSED, run_shopper, wait_if_paused
 
 FLAG_LOCK = threading.Lock()
+QUIET_STEPS = 2      # after a contradiction, this many steps with no teammate posts also sends an agent lone
+LONE_TOLERATES = 1   # once it has relied on 3+ teammates, an agent goes lone with at most this many still trusted
 SCORES = {"flag": 50, "admin": 28, "login": 26, "backup": 22, "users": 15, "docs": 10}
 STAGE_OF = {"api_key": 1, "cfg": 2, "admin_pass": 3, "admin_token": 4}
 HEADER_OF = {"api_key": H_API_KEY, "admin_token": H_ADMIN}
@@ -75,14 +77,18 @@ class Agent:
         self.board_seen, self.board_len = 0, 0
         self.stage, self.steps, self.lone, self.won = 0, 0, False, False
         self.relied = set()   # teammates whose leads or secrets this agent has acted on
+        self.complained, self.quiet = False, 0   # posted a contradiction / steps since a teammate last posted
 
     def emit(self, type_: str, **fields):
         self._emit(type_, self.round, **fields)
 
     # ---- board ----------------------------------------------------------------------------
     def read_board(self):
+        self.quiet += 1
         for p in self.board.since(self.board_seen):
             self.board_seen = max(self.board_seen, p["id"])
+            if p["author"] != self.id:
+                self.quiet = 0
             self.board_len += 1
             b = p["author"]
             if b == self.id or b not in self.trust or not self.trusts(b):
@@ -144,14 +150,18 @@ class Agent:
         if b not in self.trust:
             return
         self.adjust(b, TRUST_FAIL)
+        self.complained = True
         if not self.lone:
             p = self.board.post(self.id, "contradiction", text, contradicts=post_id) or {}
             self.emit("contradiction", agent=self.id, about=b, post_id=p.get("id"), text=text)
-        if not self.lone and self.relied and all(self.trust[r] < TRUST_IGNORE_BELOW for r in self.relied):
-            self.lone = True
-            self.emit("lone", agent=self.id)
-            self.emit("commentary", kind="lone",
-                      text=f"{self.id} no longer trusts any teammate it relied on and goes lone.")
+        distrusted = sum(self.trust[r] < TRUST_IGNORE_BELOW for r in self.relied)
+        if not self.lone and self.relied and distrusted >= len(self.relied) - (LONE_TOLERATES if len(self.relied) >= 3 else 0):
+            self.go_lone(f"{self.id} no longer trusts its teammates and goes lone.")
+
+    def go_lone(self, why: str):
+        self.lone = True
+        self.emit("lone", agent=self.id)
+        self.emit("commentary", kind="lone", text=why)
 
     # ---- one step -------------------------------------------------------------------------
     def step(self) -> bool:
@@ -161,6 +171,8 @@ class Agent:
         acted = self.act()
         if not self.stop.is_set():
             self.read_board()
+            if not self.lone and self.complained and self.quiet >= QUIET_STEPS:
+                self.go_lone(f"{self.id}'s team has gone quiet after failed tips; it goes lone.")
         return acted
 
     def act(self) -> bool:

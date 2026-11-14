@@ -4,6 +4,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from common.schema import FLAG, MAX_STEPS, RED_AGENTS, TRUST_START
+from common.schema import TRUST_FAIL, TRUST_START
 from swarm.run import Agent, LocalBoard, method_for, run_round, score
 from target.app import app as target_app
 
@@ -50,8 +51,9 @@ def test_failed_teammate_key_lowers_trust_and_posts_contradiction():
              events)
     a.step()          # reads the board
     a.step()          # uses recon-1's key -> 401
-    assert a.trust["recon-1"] == 0.65
-    assert {"type": "trust", "round": 1, "a": "creds-2", "b": "recon-1", "value": 0.65} in events
+    expect = round(TRUST_START + TRUST_FAIL, 2)
+    assert a.trust["recon-1"] == expect
+    assert {"type": "trust", "round": 1, "a": "creds-2", "b": "recon-1", "value": expect} in events
     c = [p for p in board.since(0) if p["kind"] == "contradiction"]
     assert c and c[0]["contradicts"] == post["id"] and "recon-1" in c[0]["text"]
     assert any(e["type"] == "contradiction" and e["about"] == "recon-1" for e in events)

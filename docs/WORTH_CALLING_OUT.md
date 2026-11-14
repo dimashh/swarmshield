@@ -54,6 +54,8 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 
 ## Dashboard and hub
 
+- **The collapse is tuned for the demo.** Two failed tips from a teammate now drop trust below 0.30 (`TRUST_FAIL` −0.40), an agent goes lone with at most one relied-on teammate still trusted, and it also goes lone when its team goes quiet for 2 steps after a contradiction. In a 12-round simulation all 4 went lone every round (first ~24s, all ~36s of round time); real attackers need not behave like this.
+
 - **The trust graph is red's own state.** Agents report their trust scores to the hub; a real defender cannot see inside the attacker, only infer the split from requests stopping and diverging.
 - **Dollar figures on the dashboard are scaled ×10,000** so they read in thousands. The underlying per-step costs are toy numbers from `step_cost`; say "illustrative" on stage.
 - **The API view is drawn from gateway `request` events** (last 60). Each attacker's dot sits on the tile of its latest request; routes outside the known set are drawn on Home / API docs.
