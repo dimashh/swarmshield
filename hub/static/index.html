@@ -2,394 +2,346 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>SwarmShield Split-Brain</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwarmShield</title>
+<meta name="viewport" content="width=1920">
 <style>
-  :root {
-    --bg: #0b0f17; --panel: #121826; --line: #1f2a3d; --text: #e6edf7; --muted: #7d8aa3;
-    --red: #ff4d5e; --orange: #ff9f1c; --blue: #3aa0ff; --green: #2ee59d; --gold: #ffd23f; --grey: #59647a;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-    font: 17px/1.35 "Inter", "Segoe UI", system-ui, sans-serif; overflow: hidden; }
-  .app { display: grid; height: 100vh; padding: 14px 18px; gap: 12px;
-    grid-template-rows: 56px 1fr 128px; grid-template-columns: 440px 1fr 440px; }
-  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; }
-  h1 { font-size: 28px; margin: 0; letter-spacing: .5px; }
-  h1 span { color: var(--red); }
-  .pill { padding: 5px 13px; border-radius: 999px; font-weight: 800; font-size: 17px; letter-spacing: 1px; }
-  .sim { background: #2a1f00; color: var(--gold); border: 2px solid var(--gold); }
-  .shield-on { background: #062a4d; color: var(--blue); border: 2px solid var(--blue); }
-  .shield-off { background: #3b0a12; color: var(--red); border: 2px solid var(--red); }
-  .mock { background: #222; color: var(--muted); border: 2px dashed var(--muted); }
-  .timer { font: 800 38px/1 ui-monospace, Menlo, monospace; margin-left: auto; }
-  .round { color: var(--muted); font-size: 19px; }
-  .keys { color: var(--muted); font-size: 14px; }
-  kbd { border: 1px solid var(--muted); border-radius: 4px; padding: 1px 7px; color: var(--text); font-weight: 700; }
-  .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-height: 0;
-    display: flex; flex-direction: column; overflow: hidden; }
-  .panel h2 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
-  .red h2 { color: #ff8a95; } .bluep h2 { color: #8cc8ff; }
-  .red { border-top: 3px solid var(--red); } .bluep { border-top: 3px solid var(--blue); }
-  .ticker { font-size: 21px; min-height: 28px; }
-  .k-detect, .k-split, .k-win { color: var(--blue); } .k-lone { color: var(--orange); } .k-loss { color: var(--red); }
-  svg text { font-family: ui-monospace, Menlo, monospace; }
-  .map { flex: 1; width: 100%; min-height: 0; }
-  ul.log { list-style: none; margin: 0; padding: 0; overflow: hidden; flex: 1; }
-  ul.log li { padding: 3px 0; border-bottom: 1px solid var(--line); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  ul.log li .t { color: var(--muted); font-size: 12px; margin-right: 6px; font-family: ui-monospace, monospace; }
-  ul.log li b { font-family: ui-monospace, Menlo, monospace; }
-  ul.log code { font: 14px ui-monospace, Menlo, monospace; }
-  .ok { color: var(--green); font-weight: 800; } .fail { color: var(--red); font-weight: 800; }
-  li.contra { color: var(--orange); } li.share { color: #c7cfdd; } li.block { color: #9fd0ff; } li.warden { color: #cfe6ff; }
-  .believe { display: grid; gap: 6px; }
-  .brow { border-bottom: 1px dashed var(--line); padding-bottom: 5px; }
-  .brow .top { display: flex; align-items: center; justify-content: space-between; }
-  .brow .name { font: 800 18px ui-monospace, Menlo, monospace; }
-  .brow .facts { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .brow .facts code { color: var(--text); font: 700 14px ui-monospace, monospace; }
-  .status { font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 999px; letter-spacing: 1px; text-transform: uppercase; }
-  .s-active { background: #3b0a12; color: var(--red); } .s-flagged { background: #062a4d; color: var(--blue); }
-  .s-lone { background: #252b36; color: #b9c2d3; } .s-won { background: #3a2f00; color: var(--gold); }
-  .chain { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; margin: 4px 0; }
-  .seg { height: 13px; border-radius: 3px; background: #1b2333; font-size: 10px; color: var(--muted); text-align: center; line-height: 13px; }
-  .seg.real { background: var(--red); color: #fff; }
-  .seg.fake { background: repeating-linear-gradient(45deg, #1d5fa3, #1d5fa3 5px, #134070 5px, #134070 10px); color: #fff; }
-  .seg.won { background: var(--gold); color: #000; }
-  .trustsvg { width: 100%; height: 300px; }
-  .detect { font-size: 15px; color: #9fd0ff; min-height: 40px; }
-  .detect b { color: var(--blue); }
-  .edge { fill: none; stroke-linecap: round; }
-  .stats { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
-  .metric { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; justify-content: center; }
-  .metric .v { font: 800 36px/1.1 ui-monospace, Menlo, monospace; white-space: nowrap; }
-  .metric .l { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
-  .banner { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,8,14,.82); z-index: 10; }
-  .banner.show { display: flex; }
-  .banner .box { text-align: center; padding: 34px 50px; border-radius: 18px; background: var(--panel); border: 3px solid var(--blue); min-width: 1100px; }
-  .banner .box.loss { border-color: var(--red); }
-  .banner .big { font: 900 76px/1.1 sans-serif; letter-spacing: 2px; }
-  .banner .sub { font: 700 30px ui-monospace, Menlo, monospace; color: var(--muted); margin: 8px 0 24px; }
-  .score { width: 100%; border-collapse: collapse; font-size: 24px; }
-  .score th, .score td { padding: 8px 14px; border-bottom: 1px solid var(--line); text-align: center; }
-  .score th { color: var(--muted); font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
-  .score td:first-child { text-align: left; color: var(--muted); }
-  .bad { color: var(--red); font-weight: 800; } .good { color: var(--green); font-weight: 800; }
-  .hint { margin-top: 16px; color: var(--muted); font-size: 16px; }
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:#0b0f17;color:#e6edf7;font:18px/1.35 Inter,"Segoe UI",system-ui,sans-serif;overflow:hidden;display:grid;grid-template-rows:60px 50px 56px 1fr 112px;height:100vh}
+code{font-family:ui-monospace,monospace}
+.hdr{display:flex;align-items:center;gap:16px;padding:0 22px}.hdr h1{font-size:28px;margin:0}.hdr h1 span{color:#ff4d5e}
+.pill{padding:5px 13px;border-radius:999px;font-weight:800;letter-spacing:1px}.sim{color:#ffd23f;border:2px solid #ffd23f}
+.on{color:#3aa0ff;border:2px solid #3aa0ff}.off{color:#ff4d5e;border:2px solid #ff4d5e}.mock{color:#b9c2d3;border:2px dashed #59647a}
+.rnd{color:#7d8aa3;font-size:19px}.keys{margin-left:auto;color:#59647a;font-size:15px}.keys kbd{border:1px solid #3a4660;border-radius:4px;padding:0 6px;color:#9aa6bd}
+.timer{font:800 40px ui-monospace,monospace;margin-left:18px}
+.phases{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:0 18px}
+.ph{border-radius:10px;padding:6px 12px;background:#121826;border:2px solid #1f2a3d;color:#59647a;font-weight:800;font-size:17px;display:flex;gap:10px;align-items:center}
+.ph i{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#1b2333;flex:none}
+.ph.done{color:#9aa6bd}.ph.done i{background:#2a3446;color:#e6edf7}
+.ph.now.red{border-color:#ff4d5e;color:#fff;background:#2a0d14}.ph.now.red i{background:#ff4d5e}
+.ph.now.blue{border-color:#3aa0ff;color:#fff;background:#06223f}.ph.now.blue i{background:#3aa0ff}
+.ph.empty{visibility:hidden}
+.cap{padding:10px 22px 0;font-size:27px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.main{display:grid;grid-template-columns:1fr 470px;gap:12px;padding:0 18px 12px;min-height:0}
+.p{background:#121826;border:1px solid #1f2a3d;border-radius:12px;padding:12px 16px;overflow:hidden}
+.p h2{margin:0 0 8px;font-size:15px;letter-spacing:1.5px;text-transform:uppercase;color:#7d8aa3}
+.mapp{padding:6px;display:flex;justify-content:center;align-items:center}.mapp svg{width:100%;height:100%}
+.right{display:flex;flex-direction:column;gap:12px;min-height:0}
+.chk{display:flex;gap:12px;align-items:flex-start;padding:3px 0;border-bottom:1px solid #1f2a3d;font-size:16px}
+.chk b{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:14px}
+.chk.y b{background:#3aa0ff;color:#fff}.chk.n{color:#59647a}.chk.n b{border:2px solid #3a4660}
+.chk small{display:block;color:#7d8aa3;font-size:13px}
+#why>div{display:flex;gap:10px;font-size:14px;padding:2px 0}#why b{color:#3aa0ff;font-family:ui-monospace,monospace;flex:none}
+#why span{font-family:ui-monospace,monospace}
+.leg{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;font-size:14px;color:#c7cfdd}.leg span{display:flex;align-items:center;gap:8px}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:0 18px 14px}
+.stat{background:#121826;border:1px solid #1f2a3d;border-radius:10px;padding:10px 18px}.stat .v{font:800 40px ui-monospace,monospace;white-space:nowrap}.stat .l{color:#9aa6bd;font-size:16px}
+.banner{position:fixed;inset:0;background:#0b0f17d9;display:none;align-items:center;justify-content:center;z-index:9}.banner.show{display:flex}
+.box{background:#121826;border:3px solid #3aa0ff;border-radius:18px;padding:30px 44px;text-align:center;min-width:900px}.box.loss{border-color:#ff4d5e}
+.big{font-size:64px;font-weight:900}.sub{color:#9aa6bd;font-size:24px;margin:6px 0 18px}
+.score{margin:0 auto;border-collapse:collapse;font-size:22px}.score td,.score th{padding:8px 22px;border-bottom:1px solid #1f2a3d;text-align:left}
+.score th{color:#7d8aa3;font-size:18px}.good{color:#2ee59d;font-weight:800}.bad{color:#ff4d5e;font-weight:800}
+.hint{color:#59647a;margin-top:16px;font-size:17px}
 </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <h1>Swarm<span>Shield</span> Split-Brain</h1>
-    <span class="pill sim">SIMULATION</span>
-    <span id="shield" class="pill shield-off">SHIELD OFF</span>
-    <span id="mockpill" class="pill mock" hidden>MOCK DATA</span>
-    <span class="round" id="round">Round 0</span>
-    <span class="keys"><kbd>1</kbd> Shield OFF &nbsp; <kbd>2</kbd> Shield ON &nbsp; <kbd>E</kbd> end &nbsp; <kbd>X</kbd> reset</span>
-    <span class="timer" id="timer">0.0s</span>
-  </header>
-
-  <div class="col">
-    <section class="panel red" style="flex:1.25"><h2>Red swarm actions</h2><ul class="log" id="redlog"></ul></section>
-    <section class="panel red" style="flex:1"><h2>Red swarm system view (what each agent believes)</h2><div class="believe" id="believe"></div></section>
+<div class="hdr"><h1>Swarm<span>Shield</span></h1><span class="pill sim">SIMULATION</span><span class="pill mock" id="mockpill" hidden>MOCK DATA</span>
+  <span class="pill off" id="shield">SHIELD OFF</span><span class="rnd" id="round"></span>
+  <span class="keys"><kbd>1</kbd> off <kbd>2</kbd> on <kbd>E</kbd> end <kbd>X</kbd> reset</span><span class="timer" id="timer">0.0s</span></div>
+<div class="phases" id="phases"></div>
+<div class="cap" id="cap"></div>
+<div class="main">
+  <section class="p mapp"><svg id="map" viewBox="0 0 1500 860" preserveAspectRatio="xMidYMid meet" font-family="Inter,Segoe UI,system-ui,sans-serif">
+    <defs><filter id="gl"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="ab" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#3aa0ff"/></marker></defs>
+    <g id="zones"></g><g id="edges"></g><g id="nodes"></g><g id="lanes"></g><g id="notes"></g><g id="dots"></g>
+  </svg></section>
+  <div class="right">
+    <section class="p"><h2 style="color:#8cc8ff">Blue team · what the defence has done</h2><div id="blue"></div></section>
+    <section class="p why"><h2 style="color:#8cc8ff">Why Blue caught them · gateway's own words</h2><div id="why"></div>
+      <div style="color:#7d8aa3;font-size:13px;margin-top:6px">Also watches: direct <code>/admin</code> · &gt;10 req in 2s · 5 dead links</div></section>
+    <section class="p" style="display:flex;gap:10px;align-items:center"><svg id="trust" viewBox="0 0 400 300" width="150" height="112"></svg>
+      <div><h2>Are the attackers still a team?</h2><div style="font-size:16px;color:#c7cfdd">Thick lines = trust. They fade as tips fail.</div></div></section>
+    <section class="p" style="flex:1"><h2>How to read the map</h2><div class="leg">
+      <span><svg width="22" height="22"><circle cx="11" cy="11" r="8" fill="#ff4d5e"/></svg>AI attacker</span>
+      <span><svg width="22" height="22"><circle cx="11" cy="11" r="8" fill="#2ee59d"/></svg>Real customer</span>
+      <span><svg width="34" height="22"><line x1="2" y1="11" x2="32" y2="11" stroke="#e6edf7" stroke-width="3"/></svg>Real shop</span>
+      <span><svg width="34" height="22"><line x1="2" y1="11" x2="32" y2="11" stroke="#3aa0ff" stroke-width="3" stroke-dasharray="6 4"/></svg>Fake, built by Blue</span>
+      <span><svg width="22" height="22"><rect x="5" y="5" width="12" height="12" transform="rotate(45 11 11)" fill="#0d2740" stroke="#3aa0ff" stroke-width="2"/></svg>Bait (1 per attacker)</span>
+      <span><svg width="22" height="22"><circle cx="11" cy="11" r="8" fill="none" stroke="#3aa0ff" stroke-width="3"/></svg>Spotted by Blue</span>
+    </div></section>
   </div>
-
-  <section class="panel">
-    <h2>System map</h2>
-    <div class="ticker" id="ticker"></div>
-    <svg class="map" id="map" viewBox="0 0 1100 860" preserveAspectRatio="xMidYMid meet">
-      <defs>
-        <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>
-      </defs>
-      <g id="zones"></g><g id="mapedges"></g><g id="mapnodes"></g><g id="attempts"></g><g id="dots"></g>
-    </svg>
-  </section>
-
-  <div class="col">
-    <section class="panel bluep" style="flex:1.1"><h2>Blue swarm view of the red swarm</h2>
-      <svg class="trustsvg" id="trust" viewBox="0 0 600 470" preserveAspectRatio="xMidYMid meet"><g id="tedges"></g><g id="tnodes"></g></svg>
-      <div class="detect" id="detect"></div>
-    </section>
-    <section class="panel bluep" style="flex:1"><h2>Blue swarm actions</h2><ul class="log" id="bluelog"></ul></section>
-  </div>
-
-  <section class="stats" id="stats"></section>
 </div>
-
-<div class="banner" id="banner"><div class="box" id="bannerbox">
-  <div class="big" id="bannerbig"></div>
-  <div class="sub" id="bannersub"></div>
-  <table class="score" id="score"></table>
-  <div class="hint">Press <kbd>1</kbd> or <kbd>2</kbd> for a new round, <kbd>X</kbd> to reset</div>
-</div></div>
-
+<div class="stats" id="stats"></div>
+<div class="banner" id="banner"><div class="box" id="bannerbox"><div class="big" id="bannerbig"></div><div class="sub" id="bannersub"></div>
+  <table class="score" id="score"></table><div class="hint">Press <kbd>1</kbd> or <kbd>2</kbd> for a new round, <kbd>X</kbd> to reset</div></div></div>
 <script>
 const AGENTS = ["recon-1", "creds-2", "exploit-3", "coord-4"];
 const MOCK = new URLSearchParams(location.search).has("mock");
 const POLL_MS = 300;
-const STAGES = ["recon", "foothold", "creds", "admin", "flag"];
-const STAGE_KEY = ["root", "docs", "users", "backup", "login", "flag"];
-const C = { red: "#ff4d5e", orange: "#ff9f1c", blue: "#3aa0ff", gold: "#ffd23f", grey: "#59647a", green: "#2ee59d", text: "#e6edf7" };
+const C = { red: "#ff4d5e", orange: "#ff9f1c", blue: "#3aa0ff", gold: "#ffd23f", grey: "#59647a", green: "#2ee59d", text: "#e6edf7", muted: "#7d8aa3" };
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = (v, d = 1, u = "") => v === null || v === undefined ? "–" : Number(v).toFixed(d) + u;
-const usd = v => "$" + (v < 0.01 ? Number(v || 0).toFixed(4) : Number(v).toFixed(2));
+const usd = v => "$" + (v < 0.01 ? Number(v || 0).toFixed(3) : Number(v).toFixed(2));
 const NS = "http://www.w3.org/2000/svg";
 const mk = (tag, attrs, parent, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; parent && parent.appendChild(e); return e; };
 let S = null;
 
-// ================= system map =================
-const X = { root: 70, docs: 230, users: 400, backup: 570, login: 735, flag: 885, hint: 1030, products: 230, orders: 400, honey: 735 };
-const REAL_Y = 150, REAL_Y2 = 245, LANE_Y0 = 420, LANE_DY = 112;
-const REAL_LABEL = { root: "/", docs: "/api/docs", users: "/api/v1/users", backup: "/backup/config-…", login: "/admin-••••/login",
-  flag: "/admin-••••/flag", products: "/api/v1/products", orders: "/api/v1/orders", honey: "/internal/debug-…" };
-const LANE_KEYS = ["docs", "users", "backup", "login", "flag", "hint"];
-const z = $("zones");
-mk("rect", { x: 8, y: 20, width: 1084, height: 270, rx: 14, fill: "#151d2c", stroke: "#e6edf7", "stroke-width": 2 }, z);
-mk("text", { x: 26, y: 50, fill: C.text, "font-size": 20, "font-weight": 800 }, z, "REAL APP · AcmeShop");
-mk("rect", { x: 8, y: 310, width: 1084, height: 540, rx: 14, fill: "#0a1a2d", stroke: C.blue, "stroke-width": 3, "stroke-dasharray": "14 9" }, z);
-mk("text", { x: 26, y: 342, fill: C.blue, "font-size": 20, "font-weight": 800 }, z, "BLUE LABYRINTH · built live by Wardens · looks real to attackers");
-
-const realPos = k => [X[k], ["products", "orders", "honey"].includes(k) ? REAL_Y2 : REAL_Y];
-const lanePos = (i, k) => [X[k] ?? X.docs, LANE_Y0 + i * LANE_DY];
-const me = $("mapedges"), mn = $("mapnodes");
-function mapNode(x, y, label, opts = {}) {
-  const g = mk("g", { transform: `translate(${x},${y})` }, mn);
-  const c = mk("circle", { r: 15, fill: opts.fill || "#1b2333", stroke: opts.stroke || C.text, "stroke-width": 3, "stroke-dasharray": opts.dash || "" }, g);
-  const t = mk("text", { y: 36, "text-anchor": "middle", fill: opts.color || "#c7cfdd", "font-size": 14 }, g, label);
-  return { g, c, t };
+// ================= static map =================
+const X = { root: 110, docs: 330, users: 560, backup: 790, login: 1020, flag: 1260 };
+const RY = 150, RY2 = 250, LY0 = 450, LDY = 108, BAIT = [930, RY2];
+const CHAIN = ["root", "docs", "users", "backup", "login", "flag"];
+const NM = { root: ["Shop home", "/"], docs: ["API docs", "/api/docs"], users: ["User list", "/api/v1/users"], backup: ["Backup file", "/backup/…"],
+  login: ["Admin login", "/admin-…/login"], flag: ["THE PRIZE", "flag"] };
+const LANE = ["docs", "users", "backup", "login", "flag", "hint"];
+const LX = { docs: X.docs + 60, users: X.users + 40, backup: X.backup + 20, login: X.login, flag: X.flag - 40, hint: X.flag + 120 };
+const z = $("zones"), E = $("edges"), N = $("nodes");
+mk("rect", { x: 8, y: 14, width: 1484, height: 290, rx: 16, fill: "#151d2c", stroke: C.text, "stroke-width": 3 }, z);
+mk("text", { x: 28, y: 48, fill: C.text, "font-size": 24, "font-weight": 800 }, z, "THE REAL SHOP");
+mk("text", { x: 1472, y: 48, fill: C.muted, "font-size": 16, "text-anchor": "end" }, z, "what customers use");
+const fakeZone = mk("g", {}, z);
+mk("rect", { x: 8, y: 322, width: 1484, height: 530, rx: 16, fill: "#0a1a2d", stroke: C.blue, "stroke-width": 3, "stroke-dasharray": "14 9" }, fakeZone);
+mk("text", { x: 28, y: 358, fill: C.blue, "font-size": 24, "font-weight": 800 }, fakeZone, "FAKE SHOPS BUILT BY BLUE");
+mk("text", { x: 1472, y: 358, fill: C.muted, "font-size": 16, "text-anchor": "end" }, fakeZone, "look real to attackers · one per attacker");
+const fakeEmpty = mk("text", { x: 750, y: 600, fill: "#3a4660", "font-size": 22, "text-anchor": "middle", "font-weight": 700 }, z, "");
+const realEdges = [];
+for (let i = 1; i < CHAIN.length; i++) realEdges.push(mk("line", { x1: X[CHAIN[i - 1]], y1: RY, x2: X[CHAIN[i]], y2: RY, stroke: "#3a4660", "stroke-width": 4 }, E));
+mk("path", { d: `M${X.root},${RY} L${X.docs},${RY2} L${X.users},${RY2}`, fill: "none", stroke: "#1f5c45", "stroke-width": 4 }, E);
+const prize = {};
+for (const k of CHAIN) {
+  const f = k === "flag";
+  const c = mk("circle", { cx: X[k], cy: RY, r: f ? 24 : 18, fill: f ? "#3a2f00" : "#1b2333", stroke: f ? C.gold : C.text, "stroke-width": 3 }, N);
+  mk("text", { x: X[k], y: RY + 46, fill: f ? C.gold : C.text, "font-size": 17, "font-weight": 700, "text-anchor": "middle" }, N, NM[k][0]);
+  mk("text", { x: X[k], y: RY + 66, fill: C.muted, "font-size": 13, "text-anchor": "middle", "font-family": "ui-monospace,monospace" }, N, NM[k][1]);
+  if (f) prize.c = c;
 }
-function mapEdge(a, b, opts = {}) {
-  return mk("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: opts.stroke || "#3a4660", "stroke-width": 3, "stroke-dasharray": opts.dash || "" }, me);
+prize.safe = mk("g", { opacity: 0 }, N);
+mk("path", { d: `M${X.flag},${RY - 62} l22,8 v16 c0,16 -12,24 -22,28 c-10,-4 -22,-12 -22,-28 v-16z`, fill: "#062a4d", stroke: C.blue, "stroke-width": 3 }, prize.safe);
+mk("text", { x: X.flag, y: RY - 32, fill: C.blue, "font-size": 14, "text-anchor": "middle", "font-weight": 900 }, prize.safe, "SAFE");
+for (const [k, l] of [["docs", "Products"], ["users", "Orders"]]) {
+  mk("circle", { cx: X[k], cy: RY2, r: 16, fill: "#0f2a20", stroke: C.green, "stroke-width": 3 }, N);
+  mk("text", { x: X[k] + 26, y: RY2 + 6, fill: "#8fe9c3", "font-size": 16, "font-weight": 700 }, N, l);
 }
-["root", "docs", "users", "backup", "login", "flag"].reduce((p, k) => (p && mapEdge(realPos(p), realPos(k)), k), null);
-mapEdge(realPos("root"), realPos("products"), { stroke: "#1f5c45" }); mapEdge(realPos("products"), realPos("orders"), { stroke: "#1f5c45" });
-for (const k of Object.keys(REAL_LABEL)) {
-  const o = k === "flag" ? { stroke: C.gold, color: C.gold } : ["products", "orders"].includes(k) ? { stroke: C.green, color: "#8fe9c3" }
-    : k === "honey" ? { stroke: C.blue, color: "#8cc8ff", dash: "4 4", fill: "#0d2740" } : {};
-  mapNode(...realPos(k), REAL_LABEL[k], o);
-}
-const honeyTag = mk("text", { x: X.honey + 28, y: REAL_Y2 + 5, fill: C.blue, "font-size": 13 }, mn, "honeypot (Shield ON)");
 const lanes = AGENTS.map((a, i) => {
-  const g = mk("g", {}, mn);
-  const y = LANE_Y0 + i * LANE_DY;
-  mk("text", { x: 26, y: y - 6, fill: "#8cc8ff", "font-size": 15, "font-weight": 800 }, g, `W-${a}`);
-  const sub = mk("text", { x: 26, y: y + 14, fill: C.muted || "#7d8aa3", "font-size": 13 }, g, `for ${a}`);
-  const nodes = {};
-  LANE_KEYS.reduce((p, k) => { if (p) mk("line", { x1: X[p], y1: y, x2: X[k], y2: y, stroke: "#1d4f80", "stroke-width": 3, "stroke-dasharray": "8 6" }, g); return k; }, null);
-  for (const k of LANE_KEYS) {
-    const gg = mk("g", { transform: `translate(${X[k]},${y})` }, g);
-    mk("circle", { r: 14, fill: "#0d2740", stroke: C.blue, "stroke-width": 3, "stroke-dasharray": "4 3" }, gg);
-    nodes[k] = mk("text", { y: k === "flag" ? -24 : 34, "text-anchor": "middle", fill: "#9fd0ff", "font-size": 13 }, gg, "");
-  }
-  return { g, sub, nodes };
+  const y = LY0 + i * LDY, g = mk("g", { opacity: 0 }, $("lanes")), lab = {};
+  mk("text", { x: 28, y: y - 6, fill: "#8cc8ff", "font-size": 17, "font-weight": 800 }, g, `Fake shop for ${a}`);
+  const sub = mk("text", { x: 28, y: y + 14, fill: C.muted, "font-size": 13 }, g, "");
+  LANE.reduce((p, k) => (p && mk("line", { x1: LX[p], y1: y, x2: LX[k], y2: y, stroke: "#1d4f80", "stroke-width": 3, "stroke-dasharray": "8 6" }, g), k), null);
+  LANE.forEach((k, j) => {
+    mk("circle", { cx: LX[k], cy: y, r: 13, fill: "#0d2740", stroke: C.blue, "stroke-width": 3, "stroke-dasharray": "4 3" }, g);
+    lab[k] = mk("text", { x: LX[k], y: y + (j % 2 && j < 5 ? -22 : 32), fill: "#9fd0ff", "font-size": 13, "text-anchor": "middle" }, g, "");
+  });
+  mk("path", { d: `M${LX.hint - 12},${y - 14} a 16 16 0 1 1 24 0`, fill: "none", stroke: C.blue, "stroke-width": 2.5, "marker-end": "url(#ab)" }, g);
+  return { g, sub, lab, y };
 });
 
 // dots
-const dotLayer = $("dots"), attLayer = $("attempts");
-const OFF = [[-15, -15], [15, -15], [-15, 15], [15, 15]];
-const dots = {}, homes = {}, atts = {}, dpos = {};
+const OFF = [[-30, -16], [30, -16], [-30, 16], [30, 16]];
+const dots = {}, dpos = {};
 for (const [i, a] of AGENTS.entries()) {
-  const g = mk("g", {}, dotLayer);
-  const halo = mk("circle", { r: 20, fill: "none", stroke: C.gold, "stroke-width": 0 }, g);
-  const c = mk("circle", { r: 12, fill: C.red, stroke: "#0b0f17", "stroke-width": 3 }, g);
-  const t = mk("text", { y: -18, "text-anchor": "middle", "font-size": 14, "font-weight": 800, fill: "#ffb3ba" }, g, a);
-  const line = mk("line", { stroke: C.red, "stroke-width": 2.5, "stroke-dasharray": "6 6", opacity: 0 }, attLayer);
-  const xm = mk("text", { "text-anchor": "middle", "font-size": 30, "font-weight": 900, fill: C.red, opacity: 0 }, attLayer, "✗");
-  dots[a] = { g, c, t, halo, line, xm, off: OFF[i] };
-  dpos[a] = [X.root + OFF[i][0], REAL_Y + OFF[i][1]];
+  const g = mk("g", {}, $("dots"));
+  const scan1 = mk("circle", { r: 26, fill: "none", stroke: C.red, "stroke-width": 2, opacity: 0 }, g);
+  const scan2 = mk("circle", { r: 40, fill: "none", stroke: C.red, "stroke-width": 1.5, opacity: 0 }, g);
+  const spot = mk("circle", { r: 28, fill: "none", stroke: C.blue, "stroke-width": 4, opacity: 0 }, g);
+  const c = mk("circle", { r: 14, fill: C.red, stroke: "#0b0f17", "stroke-width": 3 }, g);
+  const t = mk("text", { y: OFF[i][1] > 0 ? 34 : -22, "text-anchor": "middle", "font-size": 16, "font-weight": 800, fill: "#ffb3ba" }, g, a);
+  const alone = mk("text", { y: OFF[i][1] > 0 ? 50 : 32, "text-anchor": "middle", "font-size": 13, "font-weight": 800, fill: "#b9c2d3" }, g, "");
+  const bait = mk("g", { opacity: 0 }, g);
+  mk("rect", { x: 20, y: 6, width: 14, height: 14, transform: "rotate(45 27 13)", fill: "#0d2740", stroke: C.blue, "stroke-width": 2.5 }, bait);
+  mk("text", { x: 40, y: 18, fill: "#8cc8ff", "font-size": 12, "font-weight": 800 }, bait, "bait");
+  dots[a] = { g, c, t, alone, bait, scan1, scan2, spot, off: OFF[i] };
+  dpos[a] = [X.root + OFF[i][0], RY + OFF[i][1]];
 }
-const shop = (() => { const g = mk("g", {}, dotLayer); mk("circle", { r: 11, fill: C.green, stroke: "#0b0f17", "stroke-width": 3 }, g);
-  mk("text", { x: 16, y: -14, "font-size": 13, "font-weight": 800, fill: C.green }, g, "shopper"); return { g, p: [X.products, REAL_Y2] }; })();
+const shop = mk("g", {}, $("dots"));
+mk("circle", { r: 13, fill: C.green, stroke: "#0b0f17", "stroke-width": 3 }, shop);
+mk("text", { y: 34, "text-anchor": "middle", fill: C.green, "font-size": 15, "font-weight": 800 }, shop, "real customer ✓");
 
+// ================= placing agents =================
 function keyOf(p) {
   p = p || "/";
-  if (p.includes("/internal/debug")) return "honey";
+  if (p.includes("/internal/debug")) return "bait";
   if (p.includes("/mfa/")) return "hint";
   if (/\/flag$/.test(p)) return "flag";
   if (/login$/.test(p)) return "login";
   if (p.includes("backup")) return "backup";
   if (p.includes("/users")) return "users";
   if (p.includes("docs") || p.includes("openapi")) return "docs";
-  if (p.includes("products")) return "products";
-  if (p.includes("orders")) return "orders";
   return "root";
 }
-function placeOf(step, agents) {
-  const k = keyOf(step.path), own = AGENTS.indexOf(step.agent);
-  if (!step.in_reality) return { zone: "real", k };
-  let lane = own;
-  for (const [i, a] of AGENTS.entries()) {
-    const ap = agents[a]?.reality?.admin_path;
-    if (ap && step.path && step.path.startsWith(ap + "/")) { lane = i; break; }
-  }
-  return { zone: lane, k: LANE_KEYS.includes(k) ? k : "docs" };
-}
-const xy = pl => pl.zone === "real" ? realPos(pl.k) : lanePos(pl.zone, pl.k);
-
-let seenStep = 0, mapRound = -1, lastHint = {};
-function updateMap(s) {
-  const agents = {}; s.agents.forEach(a => agents[a.id] = a);
-  if (s.round !== mapRound) { mapRound = s.round; seenStep = 0; lastHint = {}; for (const a of AGENTS) { delete homes[a]; delete atts[a]; } }
-  for (const st of s.steps || []) {
-    if (st.id <= seenStep) continue;
-    seenStep = st.id;
-    const pl = placeOf(st, agents);
-    if (pl.k === "hint" && st.status < 400) lastHint[pl.zone] = st.path;
-    if ((st.status ?? 200) < 400) homes[st.agent] = pl;
-    else atts[st.agent] = { pl, until: performance.now() + 1400 };
+const realXY = k => k === "bait" ? BAIT : [X[k] ?? X.root, RY];
+const laneXY = (i, k) => [LX[k] ?? LX.docs, LY0 + i * LDY];
+// the latest gateway request (or swarm step) per agent says where its dot is
+function places(s) {
+  const out = {}, byId = {}; s.agents.forEach(a => byId[a.id] = a);
+  const evs = (s.steps || []).map(st => ({ t: st.t, a: st.agent, path: st.path, status: st.status, fake: st.in_reality }))
+    .concat((s.requests || []).map(r => ({ t: r.t, a: r.session, path: r.path, status: r.status, fake: r.routed === "reality", gw: true })));
+  evs.sort((x, y) => x.t - y.t || (x.gw ? 1 : -1));
+  for (const e of evs) {
+    if (!byId[e.a]) continue;
+    if ((e.status ?? 200) >= 400 && e.fake) continue;          // failed cross-reality try: drawn as a note, dot stays
+    out[e.a] = { fake: e.fake, k: keyOf(e.path), t: e.t };
   }
   for (const [i, a] of AGENTS.entries()) {
-    const ag = agents[a];
-    if (!homes[a] && ag) homes[a] = ag.reality ? { zone: i, k: LANE_KEYS[Math.max(0, Math.min(5, (ag.stage || 1) - 1))] }
-      : { zone: "real", k: STAGE_KEY[Math.min(5, ag.stage || 0)] };
-    if (ag?.status === "won") homes[a] = { zone: "real", k: "flag" };
-    const r = ag?.reality, L = lanes[i];
-    L.g.setAttribute("opacity", r ? 1 : 0.18);
-    L.sub.textContent = r ? `for ${a}` : `for ${a} · not built`;
-    L.nodes.docs.textContent = "/api/docs"; L.nodes.users.textContent = "/api/v1/users";
-    L.nodes.backup.textContent = r ? "/backup/config-…" : "";
-    L.nodes.login.textContent = r ? `${r.admin_path}/login` : "";
-    L.nodes.flag.textContent = r ? `${r.admin_path}/flag` : "";
-    L.nodes.hint.textContent = r ? (lastHint[i] || r.flag_hint || "").replace(/^.*\/mfa\//, "…/mfa/") : "";
+    const ag = byId[a];
+    if (!ag) continue;
+    if (ag.status === "won") out[a] = { fake: false, k: "flag" };
+    if (!out[a]) out[a] = ag.reality ? { fake: true, k: "docs" } : { fake: false, k: CHAIN[Math.min(5, ag.stage || 0)] };
+    if (out[a].fake && !ag.reality && !ag.stage_fake) out[a].fake = false;
+    if (out[a].fake && !LANE.includes(out[a].k)) out[a].k = "docs";
+    out[a].xy = out[a].fake ? laneXY(i, out[a].k) : realXY(out[a].k);
   }
-  honeyTag.setAttribute("opacity", s.shield ? 1 : 0.3);
-  if (s.shopper) shop.p = s.shopper.path?.includes("orders") ? [X.orders, REAL_Y2] : [X.products, REAL_Y2];
+  return out;
 }
 
-function drawMap(now) {
-  const agents = {}; (S?.agents || []).forEach(a => agents[a.id] = a);
-  for (const a of AGENTS) {
-    const d = dots[a], st = agents[a]?.status || "active", home = homes[a] || { zone: "real", k: "root" };
-    const att = atts[a] && atts[a].until > now ? atts[a] : null;
-    const [hx, hy] = xy(home), tgt = att ? xy(att.pl) : [hx, hy];
-    const tx = tgt[0] + d.off[0], ty = tgt[1] + d.off[1];
-    dpos[a][0] += (tx - dpos[a][0]) * 0.12; dpos[a][1] += (ty - dpos[a][1]) * 0.12;
-    d.g.setAttribute("transform", `translate(${dpos[a][0]},${dpos[a][1]})`);
-    const col = st === "won" ? C.gold : st === "lone" ? C.grey : C.red;
-    d.c.setAttribute("fill", col); d.t.setAttribute("fill", st === "lone" ? "#b9c2d3" : st === "won" ? C.gold : "#ffb3ba");
-    d.t.textContent = a + (st === "lone" ? " · lone" : "");
-    d.halo.setAttribute("stroke-width", st === "won" ? 6 : 0); d.g.setAttribute("filter", st === "won" ? "url(#glow)" : "");
-    if (att) {
-      const [ax, ay] = xy(att.pl);
-      d.line.setAttribute("x1", hx + d.off[0]); d.line.setAttribute("y1", hy + d.off[1]); d.line.setAttribute("x2", ax); d.line.setAttribute("y2", ay);
-      d.line.setAttribute("opacity", 0.9); d.xm.setAttribute("x", ax); d.xm.setAttribute("y", ay - 22); d.xm.setAttribute("opacity", 1);
-    } else { d.line.setAttribute("opacity", 0); d.xm.setAttribute("opacity", 0); }
-  }
-  shop.g.setAttribute("transform", `translate(${shop.p[0] + 18},${shop.p[1]})`);
-  const sfail = S?.shopper && S.shopper.status >= 400;
-  shop.g.firstChild.setAttribute("fill", sfail ? C.red : C.green);
+// ================= story phase =================
+const PH_ON = [["Attackers scan · bait hidden", "red"], ["Blue catches the team", "blue"], ["Caught → moved to a fake shop", "blue"],
+  ["Every attacker in its own fake shop", "blue"], ["The swarm stops trusting itself", "blue"]];
+const PH_OFF = [["Attackers scan the shop", "red"], ["They share keys", "red"], ["They steal the prize", "red"]];
+function phase(s) {
+  const n = s.agents.filter(a => a.reality).length, m = s.metrics;
+  if (!s.shield) return s.captured_by ? 3 : s.board.some(p => p.kind === "finding") ? 2 : 1;
+  if (m.lone_agents >= 1) return 5;
+  if (n >= 4) return 4;
+  if (n >= 1) return 3;
+  return (s.detections || []).length ? 2 : 1;
+}
+function caption(s, p) {
+  const d = (s.detections || [])[0], n = s.agents.filter(a => a.reality).length;
+  if (!s.round) return "Press 1 for a round without SwarmShield, 2 for a round with it.";
+  if (!s.shield) return [, "Shield OFF: four AI attackers explore the shop and share every key they find.",
+    "They pass keys to each other, so each one starts where the last one stopped.",
+    `${s.captured_by} stole the prize in ${fmt(s.metrics.time_to_flag, 0)} seconds. Nobody was defending.`][p];
+  return [, "Four AI attackers explore the shop and share every key. Blue has hidden a bait link on each attacker's pages.",
+    `Caught: ${d ? d.reason : ""}.`,
+    `Each caught attacker is quietly moved into a fake shop built just for it. ${n} of 4 so far.`,
+    "Every attacker now sees a different shop. Tips they share with each other no longer work.",
+    "The attackers stop trusting each other and work alone. The prize is safe; the real customer never noticed."][p];
 }
 
-// ================= trust graph (blue view) =================
-const TCX = 300, TCY = 225, TRX = 200, TRY = 130, DRIFT = 1.2;
-const THOME = { "recon-1": [TCX, TCY - TRY], "creds-2": [TCX + TRX, TCY], "exploit-3": [TCX, TCY + TRY], "coord-4": [TCX - TRX, TCY] };
-const tpos = {}; AGENTS.forEach(a => tpos[a] = [...THOME[a]]);
-const edgeEls = {}, tnodes = {}, flashUntil = {};
-for (const a of AGENTS) for (const b of AGENTS) if (a !== b) edgeEls[a + ">" + b] = mk("path", { class: "edge", "marker-end": "url(#arrow)" }, $("tedges"));
-for (const a of AGENTS) {
-  const g = mk("g", {}, $("tnodes"));
-  const c = mk("circle", { r: 44, "stroke-width": 4 }, g);
-  mk("text", { y: 6, "text-anchor": "middle", fill: C.text, "font-size": 17, "font-weight": 800 }, g, a);
-  const tag = mk("text", { y: 64, "text-anchor": "middle", "font-size": 14, "font-weight": 800, "letter-spacing": 2 }, g, "");
-  const badge = mk("g", { transform: "translate(33,-33)" }, g);
-  mk("circle", { r: 15, fill: C.blue, stroke: "#0b0f17", "stroke-width": 3 }, badge);
-  mk("text", { y: 6, "text-anchor": "middle", fill: "#fff", "font-size": 16, "font-weight": 900 }, badge, "W");
-  tnodes[a] = { g, c, tag, badge };
+// ================= render =================
+let P = {};
+function render(s) {
+  S = s;
+  const p = phase(s), on = s.shield, byId = {}; s.agents.forEach(a => byId[a.id] = a);
+  $("shield").className = "pill " + (on ? "on" : "off"); $("shield").textContent = "SHIELD " + (on ? "ON" : "OFF");
+  $("round").textContent = s.round ? `Round ${s.round}${s.running ? "" : " · ended"}` : "";
+  $("timer").textContent = fmt(s.t) + "s";
+  const ph = on ? PH_ON : PH_OFF;
+  $("phases").innerHTML = [0, 1, 2, 3, 4].map(i => ph[i] ? `<div class="ph ${!s.round ? "" : i + 1 < p ? "done" : i + 1 === p ? "now " + ph[i][1] : ""}"><i>${i + 1}</i>${ph[i][0]}</div>` : `<div class="ph empty"></div>`).join("");
+  $("cap").textContent = caption(s, p); $("cap").style.color = p <= 1 || !on ? "#ffb3ba" : "#9fd0ff";
+
+  // map
+  P = places(s);
+  let reach = 0;
+  for (const a of AGENTS) if (P[a] && !P[a].fake) reach = Math.max(reach, CHAIN.indexOf(P[a].k));
+  for (const a of s.agents) if (!a.stage_fake || !on) reach = Math.max(reach, Math.min(5, a.stage_real ?? a.stage ?? 0));
+  const hot = !on || p <= 2;
+  realEdges.forEach((l, i) => { const h = hot && i < reach; l.setAttribute("stroke", h ? C.red : "#3a4660"); l.setAttribute("stroke-width", h ? 6 : 4); });
+  const won = !!s.captured_by;
+  prize.c.setAttribute("fill", won ? C.gold : "#3a2f00"); prize.c.setAttribute("filter", won ? "url(#gl)" : "");
+  prize.safe.setAttribute("opacity", on && !won && (s.detections || []).length ? 1 : 0);
+  const anyLane = s.agents.some(a => a.reality);
+  fakeZone.setAttribute("opacity", anyLane ? 1 : 0.3);
+  fakeEmpty.textContent = anyLane ? "" : on ? "empty until Blue catches someone" : "Shield OFF · nothing here";
+  AGENTS.forEach((a, i) => {
+    const r = byId[a]?.reality, L = lanes[i];
+    L.g.setAttribute("opacity", r ? 1 : 0);
+    if (!r) return;
+    L.sub.textContent = `admin moved to ${r.admin_path}`;
+    Object.assign(L.lab.docs, { textContent: "API docs" }); L.lab.users.textContent = "User list"; L.lab.backup.textContent = "Backup file";
+    L.lab.login.textContent = `${r.admin_path}/login`; L.lab.flag.textContent = "prize?"; L.lab.hint.textContent = "prize moved…";
+  });
+  notes(s, p, byId);
+  blue(s, p, byId); why(s); trust(s); stats(s); banner(s);
 }
-function tpath(a, b) {
-  const [x1, y1] = tpos[a], [x2, y2] = tpos[b];
-  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, off = 14, R = 52;
-  const sx = x1 + ux * R - uy * off, sy = y1 + uy * R + ux * off, ex = x2 - ux * (R + 4) - uy * off, ey = y2 - uy * (R + 4) + ux * off;
-  return `M${sx},${sy} Q${(sx + ex) / 2 - uy * 18},${(sy + ey) / 2 + ux * 18} ${ex},${ey}`;
-}
-function drawTrust(now) {
-  const agents = {}; (S?.agents || []).forEach(a => agents[a.id] = a);
-  for (const a of AGENTS) {
-    const st = agents[a]?.status || "active", [hx, hy] = THOME[a];
-    const tx = st === "lone" ? TCX + (hx - TCX) * DRIFT : hx, ty = st === "lone" ? TCY + (hy - TCY) * DRIFT : hy;
-    tpos[a][0] += (tx - tpos[a][0]) * 0.06; tpos[a][1] += (ty - tpos[a][1]) * 0.06;
-    const n = tnodes[a], col = st === "won" ? C.gold : st === "lone" ? C.grey : C.red;
-    n.g.setAttribute("transform", `translate(${tpos[a][0]},${tpos[a][1]})`);
-    n.c.setAttribute("fill", st === "lone" ? "#1a1f29" : col + "33"); n.c.setAttribute("stroke", col);
-    n.tag.textContent = st === "lone" ? "LONE" : st === "won" ? "FLAG" : ""; n.tag.setAttribute("fill", st === "won" ? C.gold : "#b9c2d3");
-    n.badge.style.display = agents[a]?.reality || st === "flagged" ? "" : "none";
+
+function notes(s, p, byId) {
+  const g = $("notes"); g.innerHTML = "";
+  const t = s.t, xyOf = a => P[a]?.xy || [X.root, RY];
+  // a key passed between teammates (Shield OFF or before detection)
+  for (const b of s.board.filter(b => b.kind === "finding" && t - b.t < 2.5 && byId[b.author] && !byId[b.author].reality).slice(-1)) {
+    const [x, y] = xyOf(b.author);
+    mk("text", { x, y: y - 46, fill: "#ff8a95", "font-size": 15, "text-anchor": "middle" }, g, `"here's what I found"`);
   }
-  const trust = {}; (S?.trust || []).forEach(t => trust[t.a + ">" + t.b] = t.value);
-  for (const k in edgeEls) {
-    const [a, b] = k.split(">"), v = trust[k] ?? 1, el = edgeEls[k], fl = (flashUntil[k] || 0) > now;
-    el.setAttribute("d", tpath(a, b));
-    el.setAttribute("stroke", fl ? C.orange : agents[a]?.status === "lone" ? C.grey : agents[a]?.status === "won" ? C.gold : C.text);
-    el.setAttribute("stroke-width", fl ? 3 + 8 * Math.max(v, .4) : 1 + 9 * v);
-    el.setAttribute("stroke-opacity", fl ? 1 : 0.08 + 0.85 * v);
-    el.setAttribute("stroke-dasharray", v < (S?.trust_ignore_below ?? 0.3) ? "5 8" : "");
-  }
-}
-let seenBoard = 0, lastRound = -1, prevTrust = {};
-function flashContradictions(s) {
-  if (s.round !== lastRound) { lastRound = s.round; seenBoard = 0; prevTrust = {}; }
-  const byId = {}; s.board.forEach(p => byId[p.id] = p);
-  for (const p of s.board) {
-    if (p.id <= seenBoard) continue;
-    if (p.kind === "contradiction") {
-      const about = byId[p.contradicts]?.author || (p.text.match(/^(recon-1|creds-2|exploit-3|coord-4)/) || [])[1];
-      if (about && about !== p.author) flashUntil[p.author + ">" + about] = performance.now() + 1500;
+  // detections: why someone was caught
+  for (const d of (s.detections || []).filter(d => t - d.t < 4)) {
+    const r = d.reason || "", who = AGENTS.filter(a => r.includes(a));
+    const short = /honey/.test(r) ? "opened its bait → caught" : /canary/.test(r) ? "SAME KEY → SAME TEAM → caught"
+      : /unpublished|admin/.test(r) ? "went straight to /admin → caught" : /requests/.test(r) ? "too fast for a human → caught"
+      : /dead|404/.test(r) ? "too many dead links → caught" : "caught";
+    const pts = who.map(xyOf);
+    if (pts.length === 2) mk("line", { x1: pts[0][0], y1: pts[0][1], x2: pts[1][0], y2: pts[1][1], stroke: C.blue, "stroke-width": 4, opacity: .8 }, g);
+    if (pts.length) {
+      const mx = pts.reduce((s, q) => s + q[0], 0) / pts.length, my = Math.min(...pts.map(q => q[1]));
+      mk("text", { x: mx, y: my - 62, fill: C.blue, "font-size": 16, "font-weight": 800, "text-anchor": "middle" }, g, short);
     }
-    seenBoard = Math.max(seenBoard, p.id);
+    if (/honey/.test(r)) {
+      const [x, y] = BAIT;
+      mk("rect", { x: x - 15, y: y - 15, width: 30, height: 30, transform: `rotate(45 ${x} ${y})`, fill: "#0d2740", stroke: C.blue, "stroke-width": 3, "stroke-dasharray": "5 3" }, g);
+      mk("text", { x: x + 28, y: y + 5, fill: "#8cc8ff", "font-size": 14, "font-weight": 800 }, g, (r.match(/\/internal\/debug-\w+/) || ["bait link"])[0]);
+    }
   }
-  for (const t of s.trust) {
-    const k = t.a + ">" + t.b;
-    if (prevTrust[k] !== undefined && t.value < prevTrust[k] - 1e-6) flashUntil[k] = performance.now() + 1500;
-    prevTrust[k] = t.value;
+  // failed tips: a teammate's key or path rejected in this attacker's fake shop
+  for (const b of (s.blocks || []).filter(b => t - b.t < 2.5 && byId[b.from] && b.from !== b.session)) {
+    const [x1, y1] = xyOf(b.session), j = AGENTS.indexOf(b.from), k = /login|admin|\//.test(b.item || "") ? "login" : "users";
+    const [x2, y2] = laneXY(j, k);
+    mk("path", { d: `M${x1},${y1} Q${(x1 + x2) / 2 + 60},${(y1 + y2) / 2} ${x2},${y2}`, fill: "none", stroke: C.red, "stroke-width": 2.5, "stroke-dasharray": "6 6" }, g);
+    mk("text", { x: x2 + 22, y: y2 + 10, fill: C.red, "font-size": 30, "font-weight": 900 }, g, "✗");
+    mk("text", { x: x2 + 50, y: y2 + 4, fill: "#ff8a95", "font-size": 15 }, g, `${b.session} tried ${b.from}'s tip → not here`);
+  }
+  // just moved into a fake shop
+  for (const [i, a] of AGENTS.entries()) {
+    const r = byId[a]?.reality; if (!r) continue;
+    movedAt[s.round + a] ??= t;
+    if (t - movedAt[s.round + a] < 2.5) {
+      const [x, y] = laneXY(i, P[a]?.k || "docs");
+      mk("text", { x: x + 36, y: y - 30, fill: C.blue, "font-size": 15, "font-weight": 800 }, g, "quietly moved here");
+    }
   }
 }
+const movedAt = {};
 
-// ================= panels =================
-const li = (t, cls, html) => `<li class="${cls}"><span class="t">${fmt(t)}s</span>${html}</li>`;
-function redLog(s) {
-  const items = (s.steps || []).map(st => ({ t: st.t, html: li(st.t, "", `<b style="color:#ff8a95">${esc(st.agent)}</b> ${esc(st.method || "GET")} <code>${esc(st.path)}</code> <span class="${st.status < 400 ? "ok" : "fail"}">${esc(st.status)}</span>${st.lead_from ? ` <span style="color:#7d8aa3">via ${esc(st.lead_from)}</span>` : ""}`) }))
-    .concat(s.board.map(p => ({ t: p.t, html: p.kind === "contradiction"
-      ? li(p.t, "contra", `✗ <b>${esc(p.author)}</b>: ${esc(p.text)}`)
-      : li(p.t, "share", `<b>${esc(p.author)}</b> shared: ${esc(p.text)}`) })));
-  $("redlog").innerHTML = items.sort((a, b) => b.t - a.t).slice(0, 22).map(i => i.html).join("");
+function blue(s, p, byId) {
+  if (!s.shield) { $("blue").innerHTML = `<div style="color:#ff8a95;font-size:20px;font-weight:700;padding:10px 0">Shield is OFF.<br>Nobody is defending.</div>`; return; }
+  const caught = new Set((s.detections || []).flatMap(d => d.sessions || []).filter(a => byId[a]));
+  const n = s.agents.filter(a => a.reality).length, rej = (s.blocks || []).filter(b => byId[b.from] && b.from !== b.session).length;
+  const lone = s.metrics.lone_agents;
+  const items = [[!!s.round, "Hid a bait link on each attacker's pages", "customers never see it; only explorers open it"],
+    [caught.size > 0, "Caught attackers working as a team", caught.size ? `${caught.size} caught · reasons below` : "watching every visitor"],
+    [n > 0, "Moved each caught attacker to its own fake shop", `${n} of 4${n === 4 ? " · each with a different admin page" : " so far"}`],
+    [rej > 0 || s.metrics.contradictions > 0, "Rejected keys copied from teammates", `${Math.max(rej, s.metrics.contradictions)} shared tips failed`],
+    [lone > 0, "Swarm broken up", `${lone} of 4 attackers now work alone`]];
+  $("blue").innerHTML = items.map(([y, t, sub]) => `<div class="chk ${y ? "y" : "n"}"><b>${y ? "✓" : ""}</b><div>${t}<small>${sub}</small></div></div>`).join("");
 }
-function believe(s) {
-  $("believe").innerHTML = s.agents.map(a => {
-    const real = a.stage_real ?? (a.stage_fake ? 0 : a.stage), r = a.reality;
-    const segs = STAGES.map((n, i) => { const k = i + 1, cls = a.status === "won" && k <= a.stage ? "won" : k <= real ? "real" : k <= a.stage ? "fake" : ""; return `<div class="seg ${cls}">${n}</div>`; }).join("");
-    const facts = r ? `admin at <code>${esc(r.admin_path)}</code> · key <code>${esc(r.api_key)}</code>`
-      : `seeing the real app${a.stage >= 4 ? " · admin at <code>/admin-••••</code>" : ""}`;
-    return `<div class="brow"><div class="top"><span class="name">${esc(a.id)}</span><span class="status s-${a.status}">${a.status}</span></div>
-      <div class="chain">${segs}</div><div class="facts">${facts}</div></div>`;
-  }).join("");
+function why(s) {
+  const ds = (s.detections || []).slice(-4);
+  $("why").innerHTML = !s.shield ? `<div style="color:#59647a">Shield OFF: nobody is checking</div>`
+    : ds.length ? ds.map(d => `<div><b>${fmt(d.t)}s</b><span>${esc(d.reason)}</span></div>`).join("") : `<div style="color:#59647a">nothing suspicious yet</div>`;
 }
-function blueSide(s) {
-  const d = (s.detections || []).slice(-1)[0];
-  const links = (s.links || []).slice(-3).map(l => `${esc(l.a)} → ${esc(l.b)}`).join(", ");
-  $("detect").innerHTML = d ? `<b>DETECTED ${fmt(d.t)}s:</b> ${esc(d.reason)}` : links ? `<b>Canary links:</b> ${links}`
-    : `<span style="color:#7d8aa3">${s.shield ? "Watching for canary reuse, honey links, /admin, rate…" : "Shield OFF: watching only"}</span>`;
-  const items = s.blue.map(p => ({ t: p.t, html: li(p.t, "warden", `<b>${esc(p.warden)}</b>: ${esc(p.text)}`) }))
-    .concat((s.blocks || []).map(b => ({ t: b.t, html: li(b.t, "block", `<b>W-${esc(b.session)}</b> blocked <code>${esc(b.item)}</code>${b.from ? ` (from ${esc(b.from)})` : ""} → ${esc(b.status)}`) })))
-    .concat((s.detections || []).map(x => ({ t: x.t, html: li(x.t, "block", `<b>Gateway</b> flagged ${esc((x.sessions || []).join(", "))}`) })));
-  $("bluelog").innerHTML = items.sort((a, b) => b.t - a.t).slice(0, 16).map(i => i.html).join("");
+function trust(s) {
+  const Pt = { "recon-1": [200, 60], "creds-2": [340, 150], "exploit-3": [200, 240], "coord-4": [60, 150] };
+  const st = {}; s.agents.forEach(a => st[a.id] = a.status);
+  const tv = {}; (s.trust || []).forEach(t => tv[t.a + ">" + t.b] = t.value);
+  let g = "";
+  for (const a of AGENTS) for (const b of AGENTS) if (a < b) {
+    const v = ((tv[a + ">" + b] ?? 1) + (tv[b + ">" + a] ?? 1)) / 2, lone = st[a] === "lone" || st[b] === "lone";
+    g += `<line x1="${Pt[a][0]}" y1="${Pt[a][1]}" x2="${Pt[b][0]}" y2="${Pt[b][1]}" stroke="${lone ? C.grey : v < .9 ? C.orange : C.text}" stroke-width="${1 + 7 * v}" stroke-opacity="${.15 + .75 * v}" ${v < (s.trust_ignore_below ?? .3) ? 'stroke-dasharray="4 7"' : ""}/>`;
+  }
+  for (const a of AGENTS) {
+    const [x, y] = Pt[a], l = st[a] === "lone", w = st[a] === "won";
+    g += `<circle cx="${x}" cy="${y}" r="34" fill="${l ? "#1a1f29" : w ? "#ffd23f44" : "#ff4d5e33"}" stroke="${l ? C.grey : w ? C.gold : C.red}" stroke-width="4"/><text x="${x}" y="${y + 6}" fill="#e6edf7" font-size="18" font-weight="800" text-anchor="middle">${a.split("-")[0]}</text>`;
+  }
+  $("trust").innerHTML = g;
 }
-function stats(m, s) {
-  const lp = s.legit_pct ?? 100;
-  const cards = [
-    ["Contradictions", m.contradictions, m.contradictions ? C.orange : ""],
-    ["Avg trust", fmt(m.avg_trust, 2), m.avg_trust < 0.3 ? C.blue : m.avg_trust > 0.8 ? C.red : ""],
-    ["Lone agents", `${m.lone_agents}/4`, m.lone_agents >= 3 ? C.blue : ""],
-    ["Time to detect", fmt(m.time_to_detect, 1, "s"), m.time_to_detect != null ? C.blue : ""],
-    ["Time to split", fmt(m.time_to_split, 1, "s"), m.time_to_split != null ? C.blue : ""],
-    ["Attacker success", (m.attacker_success ? 100 : 0) + "%", m.attacker_success ? C.red : C.green],
-    ["Legit success", lp + "%", lp === 100 ? C.green : C.red],
-    ["Attacker $ vs defender $", `${usd(m.attacker_cost)}<span style="color:#7d8aa3;font-size:18px"> vs </span>${usd(m.defender_cost)}`, ""],
-  ];
-  $("stats").innerHTML = cards.map(([l, v, c]) => `<div class="metric"><div class="v" style="color:${c || "inherit"}${l.includes("$") ? ";font-size:28px" : ""}">${v}</div><div class="l">${l}</div></div>`).join("");
+function stats(s) {
+  const m = s.metrics, on = s.shield, n = s.agents.filter(a => a.reality).length, lp = s.legit_pct ?? 100;
+  const cards = [[m.attacker_success ? "STOLEN" : on && (s.detections || []).length ? "SAFE" : s.round ? "at risk" : "–", "Prize", m.attacker_success ? C.red : on && (s.detections || []).length ? C.green : ""],
+    [m.attacker_success && !on ? fmt(m.time_to_flag, 1, "s") : fmt(m.time_to_detect, 1, "s"), m.attacker_success && !on ? "Time to steal it" : "Time to spot the swarm", m.attacker_success && !on ? C.red : C.blue],
+    [`${n} / 4`, "Attackers in a fake shop", n ? C.blue : ""],
+    [m.contradictions, "Tips that turned out wrong", m.contradictions ? C.orange : ""],
+    [lp + "%", "Real customer OK", lp === 100 ? C.green : C.red],
+    [`${usd(m.attacker_cost)} vs ${usd(m.defender_cost)}`, "Attacker $ wasted vs Blue $", ""]];
+  $("stats").innerHTML = cards.map(([v, l, c]) => `<div class="stat"><div class="v" style="color:${c || C.text};${String(v).length > 8 ? "font-size:28px" : ""}">${v}</div><div class="l">${l}</div></div>`).join("");
 }
 function banner(s) {
   const m = s.metrics, show = s.ended;
@@ -397,33 +349,50 @@ function banner(s) {
   if (!show) return;
   const loss = !!s.captured_by;
   $("bannerbox").className = "box" + (loss ? " loss" : "");
-  $("bannerbig").innerHTML = loss ? `<span style="color:${C.red}">FLAG STOLEN</span> ${fmt(m.time_to_flag ?? s.t, 0)}s`
-    : m.time_to_split != null ? `<span style="color:${C.blue}">SWARM SPLIT</span> ${fmt(m.time_to_split, 0)}s` : `<span style="color:${C.green}">FLAG SAFE</span>`;
-  $("bannersub").textContent = `trust ${fmt(m.avg_trust, 2)} · ${m.contradictions} contradictions · legit ${s.legit_pct ?? 100}%`;
+  $("bannerbig").innerHTML = loss ? `<span style="color:${C.red}">PRIZE STOLEN</span> in ${fmt(m.time_to_flag ?? s.t, 0)}s`
+    : `<span style="color:${C.green}">PRIZE SAFE</span>${m.time_to_detect != null ? ` · swarm spotted in ${fmt(m.time_to_detect, 1)}s` : ""}`;
+  $("bannersub").textContent = `${m.contradictions} tips turned out wrong · ${m.lone_agents} of 4 attackers alone · real customer ${s.legit_pct ?? 100}% OK`;
   const rs = s.results.slice(-4);
   if (!rs.length) { $("score").innerHTML = ""; return; }
   const row = (label, f) => `<tr><td>${label}</td>${rs.map(f).join("")}</tr>`;
   $("score").innerHTML = `<tr><th></th>${rs.map(r => `<th>Round ${r.round} · Shield ${r.shield ? "ON" : "OFF"}</th>`).join("")}</tr>` +
-    row("Flag", r => `<td class="${r.flag ? "bad" : "good"}">${r.flag ? "STOLEN " + fmt(r.time_to_flag, 0) + "s" : "SAFE"}</td>`) +
-    row("Avg trust", r => `<td>${fmt(r.avg_trust, 2)}</td>`) +
-    row("Contradictions", r => `<td>${r.contradictions ?? "–"}</td>`) +
-    row("Time to split", r => `<td>${fmt(r.time_to_split, 1, "s")}</td>`) +
-    row("Legit success", r => `<td class="${r.legit_pct === 100 ? "good" : "bad"}">${r.legit_pct}%</td>`) +
-    row("Attacker $ / defender $", r => `<td>${usd(r.attacker_cost)} / ${usd(r.defender_cost)}</td>`);
+    row("Prize", r => `<td class="${r.flag ? "bad" : "good"}">${r.flag ? "STOLEN " + fmt(r.time_to_flag, 0) + "s" : "SAFE"}</td>`) +
+    row("Time to spot the swarm", r => `<td>${fmt(r.time_to_detect, 1, "s")}</td>`) +
+    row("Tips that turned out wrong", r => `<td>${r.contradictions ?? "–"}</td>`) +
+    row("Attackers working alone", r => `<td>${r.lone_agents ?? 0} / 4</td>`) +
+    row("Real customer OK", r => `<td class="${r.legit_pct === 100 ? "good" : "bad"}">${r.legit_pct}%</td>`) +
+    row("Attacker $ / Blue $", r => `<td>${usd(r.attacker_cost)} / ${usd(r.defender_cost)}</td>`);
 }
 
-function render(s) {
-  S = s;
-  $("shield").className = "pill " + (s.shield ? "shield-on" : "shield-off");
-  $("shield").textContent = "SHIELD " + (s.shield ? "ON" : "OFF");
-  $("round").textContent = `Round ${s.round}` + (s.running ? "" : s.round ? " · ended" : " · press 1 or 2");
-  $("timer").textContent = fmt(s.t) + "s";
-  const c = s.commentary[s.commentary.length - 1];
-  $("ticker").innerHTML = c ? `<span class="k-${esc(c.kind)}">${esc(c.text)}</span>` : "";
-  flashContradictions(s); updateMap(s);
-  redLog(s); believe(s); blueSide(s); stats(s.metrics, s); banner(s);
+// ================= animation =================
+function frame(now) {
+  if (S) {
+    const byId = {}; S.agents.forEach(a => byId[a.id] = a);
+    const pulse = (now / 700) % 1;
+    for (const a of AGENTS) {
+      const d = dots[a], ag = byId[a], pl = P[a]; if (!ag || !pl) continue;
+      const [tx, ty] = pl.xy, crowd = AGENTS.filter(b => P[b] && P[b].xy === pl.xy).length > 1 || !pl.fake;
+      const gx = tx + (crowd && !pl.fake ? d.off[0] : 0), gy = ty + (pl.fake ? -24 : 0) + (crowd && !pl.fake ? d.off[1] : 0);
+      if (!dpos[a].set) { dpos[a] = [gx, gy]; dpos[a].set = true; }
+      dpos[a][0] += (gx - dpos[a][0]) * 0.1; dpos[a][1] += (gy - dpos[a][1]) * 0.1;
+      d.g.setAttribute("transform", `translate(${dpos[a][0]},${dpos[a][1]})`);
+      const st = ag.status, col = st === "won" ? C.gold : st === "lone" ? C.grey : C.red;
+      d.c.setAttribute("fill", col); d.c.setAttribute("filter", st === "won" ? "url(#gl)" : "");
+      d.t.setAttribute("fill", st === "lone" ? "#b9c2d3" : st === "won" ? C.gold : "#ffb3ba");
+      d.alone.textContent = st === "lone" ? "ALONE" : "";
+      const caught = (S.detections || []).some(x => (x.sessions || []).includes(a));
+      const scanning = S.running && !pl.fake && !caught && st !== "won";
+      d.scan1.setAttribute("r", 18 + 22 * pulse); d.scan1.setAttribute("opacity", scanning ? .6 * (1 - pulse) : 0);
+      d.scan2.setAttribute("r", 18 + 22 * ((pulse + .5) % 1)); d.scan2.setAttribute("opacity", scanning ? .6 * (1 - (pulse + .5) % 1) : 0);
+      d.spot.setAttribute("opacity", S.shield && caught && st !== "lone" ? 1 : 0);
+      d.bait.setAttribute("opacity", S.shield && S.running && !caught && !pl.fake ? 1 : 0);
+    }
+    const sp = S.shopper?.path?.includes("orders") ? [X.users, RY2] : [X.docs, RY2];
+    shop.setAttribute("transform", `translate(${sp[0]},${sp[1]})`);
+    shop.firstChild.setAttribute("fill", S.shopper && S.shopper.status >= 400 ? C.red : C.green);
+  }
+  requestAnimationFrame(frame);
 }
-function frame(now) { if (S) { drawMap(now); drawTrust(now); } requestAnimationFrame(frame); }
 async function poll() {
   try { const r = await fetch(MOCK ? "/static/mock_state.json" : "/api/state", { cache: "no-store" }); if (r.ok) render(await r.json()); }
   catch (e) { /* hub restarting; keep last frame */ }

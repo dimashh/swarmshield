@@ -13,7 +13,7 @@ from common.schema import RED_AGENTS, TRUST_IGNORE_BELOW, TRUST_START
 
 STATIC = Path(__file__).parent / "static"
 EVENTS_LOG = Path(__file__).resolve().parent.parent / "events.jsonl"
-BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP, STEPS_KEEP, BLOCKS_KEEP = 14, 10, 4, 40, 12
+BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP, STEPS_KEEP, BLOCKS_KEEP, REQUESTS_KEEP = 14, 10, 4, 40, 12, 40
 SPLIT_AT_LONE = 3
 
 app = FastAPI(title="SwarmShield hub")
@@ -43,7 +43,7 @@ class Round:
         self.real_hits_after_detect = 0
         self.legit_ok = self.legit_fail = 0
         self.lone_order = []
-        self.steps, self.blocks, self.detections = [], [], []
+        self.steps, self.blocks, self.detections, self.requests = [], [], [], []
         self.shopper = None
 
     def t(self):
@@ -132,8 +132,15 @@ def _apply(ev):
         else:
             R.legit_fail += 1
     elif typ == "request":
-        if ev.get("routed") == "real" and ev.get("session") in R.flagged:
+        s = ev.get("session")
+        if ev.get("routed") == "real" and s in R.flagged:
             R.real_hits_after_detect += 1
+        if s in R.agents:
+            R.requests.append({"t": ev["t"], "session": s, "method": ev.get("method", "GET"), "path": ev.get("path"),
+                               "routed": ev.get("routed"), "status": ev.get("status")})
+            del R.requests[:-REQUESTS_KEEP]
+        elif ev.get("routed") == "forward_legit":
+            R.shopper = {"t": ev["t"], "method": ev.get("method"), "path": ev.get("path"), "status": ev.get("status")}
     elif typ == "canary_link":
         link = {"a": ev.get("a"), "b": ev.get("b"), "token": ev.get("token")}
         if not any(l["a"] == link["a"] and l["b"] == link["b"] for l in R.links):
@@ -309,7 +316,7 @@ def state():
                 "board": R.board[-BOARD_KEEP:], "blue": R.blue[-BLUE_KEEP:],
                 "commentary": R.commentary[-COMMENTARY_KEEP:],
                 "steps": R.steps[-STEPS_KEEP:], "blocks": R.blocks[-BLOCKS_KEEP:],
-                "detections": R.detections[-3:], "shopper": R.shopper,
+                "detections": R.detections[-6:], "requests": R.requests, "shopper": R.shopper,
                 "metrics": _metrics(), "legit_pct": _legit_pct(), "results": results}
 
 

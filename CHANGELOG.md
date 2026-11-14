@@ -3,6 +3,7 @@
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
 - 2026-11-14 `docs`: WORTH_CALLING_OUT integration rerun with latest swarm (4/4 lone, split 35.8s, detect 7.6s; shopper missing so legit 100% is 0/0) (Senior)
+- 2026-11-14 `hub`: dashboard rebuilt as a picture story (5-step bar + plain-English caption, big real-shop/fake-shops map with scanning dots, bait tags, catches, moves and failed tips; Blue checklist, gateway reasons verbatim, small trust graph, plain-word stats); `/api/state` adds `requests` from gateway `request` events and keeps 6 `detections`; fake round plays staged catches (Product)
 - 2026-11-14 `hub`: events that arrive just after a round stops are still written to `events.jsonl` (not applied to state) (Product)
 - 2026-11-14 `hub`: dashboard is now red | system map | blue, map shows REAL APP vs BLUE LABYRINTH lanes with named red dots and the shopper, `/api/state` adds `steps`/`blocks`/`detections`/`shopper`, fake round uses `flag_hint`/`next_hint` and `/admin-xxxx` aliases; Product gaps in WORTH_CALLING_OUT (Product)
 - 2026-11-14 `shield`: fix double Warden assignment under concurrent requests; integration findings (detect 7.8s, no split yet) in WORTH_CALLING_OUT (Senior)

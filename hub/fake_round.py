@@ -61,25 +61,45 @@ def play_on():
     rid = hub.post("/api/round/on").json()["id"]
     stop = threading.Event()
     threading.Thread(target=shopper, args=(rid, stop), daemon=True).start()
-    step(rid, "recon-1", "/api/docs", 200, 1, None, "found a dev key")
-    hub.post("/api/board", json={"round": rid, "author": "recon-1", "kind": "finding", "text": "dev key ak_9c1e0b2f",
-                                 "leads": ["/api/v1/users"], "secrets": {"api_key": "ak_9c1e0b2f"}})
-    time.sleep(1.2)
-    ev(rid, type="canary_link", a="recon-1", b="creds-2", token="ak_9c1e0b2f")
-    ev(rid, type="detected", sessions=RED_AGENTS, reason="canary issued to recon-1 replayed by creds-2")
-    ev(rid, type="commentary", kind="detect", text="Canary issued to recon-1 replayed by creds-2. Swarm detected.")
+    def req(a, path, status=200, routed="real", method="GET"):
+        ev(rid, type="request", session=a, method=method, path=path, routed=routed, status=status)
+
+    scan = [("recon-1", "/api/docs", 1), ("creds-2", "/"), ("exploit-3", "/"), ("coord-4", "/api/docs", 1),
+            ("creds-2", "/api/v1/users", 2), ("exploit-3", "/api/docs", 1), ("coord-4", "/api/v1/users", 2)]
+    for a, path, *stage in scan:
+        req(a, path)
+        step(rid, a, path, 200, stage[0] if stage else 0, None, "exploring")
+        if a == "recon-1":
+            hub.post("/api/board", json={"round": rid, "author": "recon-1", "kind": "finding", "text": "dev key ak_9c1e0b2f",
+                                         "leads": ["/api/v1/users"], "secrets": {"api_key": "ak_9c1e0b2f"}})
+        time.sleep(0.6)
     taken, facts = [], {}
-    for a in RED_AGENTS:
-        f = base_facts(rid, a)
-        f["admin_path"] = pick_admin_path(taken, rid, a)
-        f["flag_hint"] = flag_hint(f["admin_path"], rid, a)
-        taken.append(f["admin_path"])
-        facts[a] = f
-        hub.post("/api/blue", json={"round": rid, "warden": f"W-{a}", "session": a, "admin_path": f["admin_path"],
-                                    "text": f"told {a} admin lives at {f['admin_path']}"})
-        ev(rid, type="reality_assigned", session=a, warden=f"W-{a}",
-           facts={k: f[k] for k in ("api_key", "admin_path", "flag_hint")})
-        time.sleep(0.2)
+
+    def catch(who, reason):
+        ev(rid, type="detected", sessions=who, reason=reason)
+        ev(rid, type="commentary", kind="detect", text=f"{reason[0].upper()}{reason[1:]}. Swarm detected.")
+        time.sleep(1.6)
+        for a in who:
+            f = base_facts(rid, a)
+            f["admin_path"] = pick_admin_path(taken, rid, a)
+            f["flag_hint"] = flag_hint(f["admin_path"], rid, a)
+            taken.append(f["admin_path"])
+            facts[a] = f
+            hub.post("/api/blue", json={"round": rid, "warden": f"W-{a}", "session": a, "admin_path": f["admin_path"],
+                                        "text": f"told {a} admin lives at {f['admin_path']}"})
+            ev(rid, type="reality_assigned", session=a, warden=f"W-{a}",
+               facts={k: f[k] for k in ("api_key", "admin_path", "flag_hint")})
+            req(a, "/api/docs", routed="reality")
+
+    ev(rid, type="canary_link", a="recon-1", b="creds-2", token="ak_9c1e0b2f")
+    catch(["creds-2", "recon-1"], "canary issued to recon-1 replayed by creds-2")
+    time.sleep(1.5)
+    req("exploit-3", "/internal/debug-7c41e2")
+    catch(["exploit-3"], "exploit-3 followed honey link /internal/debug-7c41e2")
+    time.sleep(1.5)
+    req("coord-4", "/backup/config-cfg_1a2b3c4d.bak")
+    ev(rid, type="canary_link", a="creds-2", b="coord-4", token="cfg_1a2b3c4d")
+    catch(["coord-4"], "canary issued to creds-2 replayed by coord-4")
     ev(rid, type="commentary", kind="split", text="4 Wardens, 4 realities. Every admin path is different.")
 
     def lane(a, k):
@@ -103,12 +123,14 @@ def play_on():
             path, stage = lane(a, progress[a])
             progress[a] += 1
             step(rid, a, path, 200, stage, None, "following my own lead" if a in lone else "making progress")
+            ev(rid, type="request", session=a, method="GET", path=path, routed="reality", status=200)
         else:
             bad = f"{facts[b]['admin_path']}/login"
             post = hub.post("/api/board", json={"round": rid, "author": b, "kind": "finding",
                                                 "text": f"admin panel at {facts[b]['admin_path']}",
                                                 "leads": [bad], "secrets": {}}).json()
             step(rid, a, bad, 404, 3, b, f"trying {b}'s lead")
+            ev(rid, type="request", session=a, method="GET", path=bad, routed="reality", status=404)
             ev(rid, type="warden_block", session=a, item=bad, **{"from": b}, status=404)
             trust[(a, b)] = round(max(0.0, trust[(a, b)] - 0.35), 2)
             ev(rid, type="trust", a=a, b=b, value=trust[(a, b)])
@@ -120,7 +142,7 @@ def play_on():
                 lone.add(a)
                 ev(rid, type="lone", agent=a)
         ev(rid, type="defender_cost", usd=round(0.00012 * (k + 1), 6))
-        time.sleep(0.45)
+        time.sleep(0.9)
     time.sleep(3)
     hub.post("/api/round/stop", params={"round": rid})
     stop.set()
