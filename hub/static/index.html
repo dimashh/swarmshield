@@ -218,7 +218,8 @@ function apiView(s) {
   AGENTS.forEach((a, i) => {
     const r = by[a]?.reality, W = wEl[i];
     if (!!r !== W.on) {
-      W.on = !!r; W.g.classList.toggle("spawn", W.on && booted);   // pop only when spawned live, not on page load W.g.setAttribute("opacity", W.on ? 1 : 0.25);
+      W.on = !!r; W.g.setAttribute("opacity", W.on ? 1 : 0.25);
+      W.g.classList.toggle("spawn", W.on && booted);   // glow only when spawned live, not on page load
       W.box.setAttribute("stroke", W.on ? C.blue : "#2a3446"); W.box.setAttribute("stroke-dasharray", W.on ? "" : "6 5");
       W.title.setAttribute("fill", W.on ? "#8cc8ff" : "#59647a"); W.sub.setAttribute("fill", W.on ? C.orange : "#59647a");
     }

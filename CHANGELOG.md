@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `hub`: fix spawned Warden boxes staying dimmed (opacity update was commented out by mistake) (Senior)
 - 2026-11-14 `hub`: Warden spawn shown as a border glow instead of a scale/opacity pop (the pop could leave boxes dim in recordings) (Senior)
 - 2026-11-14 `presentation`: "Fight a swarm with a swarm" slide now shows the Shield ON swarm diagram (embedded) with the 4 numbered steps beside it (Zhaslan)
 - 2026-11-14 `swarm`+`common`+`hub`: quicker stage 5: `TRUST_FAIL` −0.75 (one failed tip distrusts a teammate), silent teammates count as distrusted after `QUIET_STEPS`; dashboard reveals lone attackers one at a time, 1.5s apart (Senior)
