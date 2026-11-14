@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `presentation`: HTML pitch `presentation/index.html` (11 slides: problem with Transluce timeline, Hugging Face incident, why patching isn't enough, red vs blue swarm, detect/deceive/disrupt, proxy placement, countermeasures, live demo handoff; arrow keys, F for full screen, single self-contained file) (Zhaslan)
 - 2026-11-14 `swarm`: lint fixes in the lone rule and swarm tests (Senior)
 - 2026-11-14 `swarm`+`common`: faster, complete collapse in stage 5: `TRUST_FAIL` −0.40 (2 failures distrust a teammate), lone with at most 1 of 3+ relied teammates still trusted, or when the team goes quiet for `QUIET_STEPS`=2 after a contradiction; all 4 lone in 12/12 simulated rounds; CONTRACTS §5/§11 updated (Senior)
 - 2026-11-14 `docs`: README rewritten: quick start (Mac, Python 3.9+), dashboard keys and step mode, how it works (canaries, Sentinel, Wardens, trust collapse, real customer), ports/owners, tests, troubleshooting, docs index, workflow (Senior)
