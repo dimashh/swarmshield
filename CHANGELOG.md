@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `swarm`: flag capture retries the hub round stop while the hub is unreachable (Graduate)
 - 2026-11-14 `swarm`: round loop is bounded by `MAX_STEPS` step slots (idle agents no longer hang `--local`); results arriving after a round ends are dropped and only the current round is stopped on a late flag (Graduate)
 - 2026-11-14 `swarm`: red swarm `swarm/run.py` (4 agents per hub round via `common/hub.py`, links/leads/secrets only, keyword scores, follows `/admin-xxxx` aliases and honey links as received, directed trust + `contradiction`/`lone`, `flag_captured` then round stop; `--local` runs against the target with no hub), `tests/test_swarm.py`, swarm gaps in `docs/WORTH_CALLING_OUT.md` (Graduate)
 - 2026-11-14 `docs`: WORTH_CALLING_OUT integration rerun with latest swarm (4/4 lone, split 35.8s, detect 7.6s; shopper missing so legit 100% is 0/0) (Senior)

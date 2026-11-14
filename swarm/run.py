@@ -279,10 +279,14 @@ def run_local(url: str):
         print(f"{a.id}: stage {a.stage}, steps {a.steps}, won {a.won}, lone {a.lone}, trust {a.trust}")
 
 
-def stop_if_current(agent: Agent):
-    """Stop the hub round only if it is still the winner's round."""
-    if (hub.get_round() or {}).get("id") == agent.round:
-        hub.stop_round()
+def stop_if_current(agent: Agent, tries: int = 20):
+    """Stop the hub round only if it is still the winner's round, retrying while the hub is unreachable."""
+    for _ in range(tries):
+        r = hub.get_round()
+        if r is not None:
+            if r.get("id") != agent.round or not r.get("running") or hub.stop_round() is not None:
+                return
+        time.sleep(POLL_ROUND_S)
 
 
 def run_with_hub(url: str):

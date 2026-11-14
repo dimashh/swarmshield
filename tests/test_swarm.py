@@ -108,3 +108,14 @@ def test_results_after_round_end_are_dropped():
               lambda t, r, **f: events.append(t), starts=True, stop=stop)
     a.step()
     assert board.since(0) == [] and events == []
+
+
+def test_flag_stop_retries_while_hub_is_down(monkeypatch):
+    import swarm.run as run
+    rounds = iter([None, None, {"id": 7, "running": True}])
+    stops = []
+    monkeypatch.setattr(run.hub, "get_round", lambda: next(rounds))
+    monkeypatch.setattr(run.hub, "stop_round", lambda: stops.append(1) or {"ok": True})
+    monkeypatch.setattr(run, "POLL_ROUND_S", 0)
+    run.stop_if_current(type("A", (), {"round": 7})())
+    assert stops == [1]
