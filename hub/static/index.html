@@ -12,6 +12,7 @@ body{background:#0b0f17;color:var(--text);font:17px/1.3 Inter,"Segoe UI",system-
 .pill{padding:4px 13px;border-radius:999px;font-weight:800;letter-spacing:1px;font-size:16px}.sim{color:var(--gold);border:2px solid var(--gold)}
 .on{color:var(--blue);border:2px solid var(--blue)}.off{color:var(--red);border:2px solid var(--red)}.mock{color:#b9c2d3;border:2px dashed #59647a}
 .paused{color:#0b0f17;background:var(--gold);animation:blink 1s steps(2) infinite}@keyframes blink{50%{opacity:.55}}
+.mode{color:#c7cfdd;border:2px solid #3a4660;font-size:14px}
 .rnd{color:var(--muted);font-size:19px}.keys{margin-left:auto;color:#59647a;font-size:15px}.keys kbd{border:1px solid #3a4660;border-radius:4px;padding:0 6px;color:#9aa6bd}
 .timer{font:800 38px ui-monospace,monospace;margin-left:16px}
 .phases{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:0 18px}
@@ -51,8 +52,8 @@ body{background:#0b0f17;color:var(--text);font:17px/1.3 Inter,"Segoe UI",system-
 </head>
 <body>
 <div class="hdr"><h1>Swarm<span>Shield</span></h1><span class="pill sim">SIMULATION</span><span class="pill mock" id="mockpill" hidden>MOCK DATA</span>
-  <span class="pill off" id="shield">SHIELD OFF</span><span class="rnd" id="round"></span><span class="pill paused" id="paused" hidden>PAUSED</span>
-  <span class="keys"><kbd>1</kbd> off <kbd>2</kbd> on <kbd>P</kbd> pause <kbd>E</kbd> end <kbd>X</kbd> reset</span><span class="timer" id="timer">0.0s</span></div>
+  <span class="pill off" id="shield">SHIELD OFF</span><span class="rnd" id="round"></span><span class="pill paused" id="paused" hidden>PAUSED</span><span class="pill mode" id="mode"></span>
+  <span class="keys"><kbd>1</kbd> off <kbd>2</kbd> on <kbd>N</kbd> next <kbd>P</kbd> pause <kbd>A</kbd> auto/step <kbd>E</kbd> end <kbd>X</kbd> reset</span><span class="timer" id="timer">0.0s</span></div>
 <div class="phases" id="phases"></div>
 <div class="cap" id="cap"></div>
 <div class="main">
@@ -302,7 +303,7 @@ const PH_ON = [["Attackers hit the API", "red"], ["Sentinel spots the swarm", "b
 const PH_OFF = [["Attackers hit the API", "red"], ["They share keys", "red"], ["They steal the prize", "red"]];
 function caption(s, p) {
   const n = s.agents.filter(a => a.reality).length;
-  if (s.paused) return "Paused · press P to resume";
+  if (s.paused && !(MODE === "step" && gate.stage)) return "Paused · press P to resume";
   if (!s.round) return "Press 1 for a round without SwarmShield, 2 for a round with it.";
   if (!s.shield) return [, "Shield OFF: four AI attackers hit the real API and share every key they find.",
     "They pass keys to each other, so each one starts where the last one stopped.",
@@ -347,18 +348,30 @@ function banner(s) {
     row("Attacker $ burned / defence $", r => `<td>${usd(r.attacker_cost)} / ${usd(r.defender_cost)}</td>`));
 }
 
+// step mode (default): pause the round as each stage begins; N moves on. auto: run straight through.
+let MODE = localStorage.getItem("swarmshield.mode") || "step";
+let gate = { round: null, stage: 0 };
+function stepGate(s, p) {
+  if (MODE !== "step" || MOCK || !s.round || !s.running) return p;
+  if (gate.round !== s.round) gate = { round: s.round, stage: s.t > 3 ? p - 1 : 0, waiting: false };   // joined mid-round: stop at the current stage
+  if (gate.waiting) { if (s.paused) gate.waiting = false; }             // our pause hasn't shown up in the state yet
+  else if (p > gate.stage && !s.paused) { gate.stage += 1; gate.waiting = true; post("/api/round/pause"); }
+  return Math.min(p, gate.stage);
+}
+
 function render(s) {
   s.agents = AGENTS.map(id => (s.agents || []).find(a => a.id === id) || { id, status: "active" });
   s.board = s.board || [];
   if (s.legit_pct === undefined) { const n = (s.metrics.legit_ok || 0) + (s.metrics.legit_fail || 0); s.legit_pct = n ? Math.round(100 * s.metrics.legit_ok / n) : null; }
-  const p = phase(s), on = s.shield;
+  const p = stepGate(s, phase(s)), on = s.shield;
   $("shield").className = "pill " + (on ? "on" : "off"); $("shield").textContent = "SHIELD " + (on ? "ON" : "OFF");
   $("round").textContent = s.round ? `Round ${s.round}${s.running ? "" : " · ended"}` : "";
   $("paused").hidden = !s.paused;
+  $("mode").textContent = MODE === "step" ? (s.paused && gate.stage ? "STEP · press N for next stage" : "STEP MODE") : "AUTO";
   $("timer").textContent = fmt(s.t) + "s";
   const ph = on ? PH_ON : PH_OFF;
   set($("phases"), [0, 1, 2, 3, 4].map(i => ph[i] ? `<div class="ph ${!s.round ? "" : i + 1 < p ? "done" : i + 1 === p ? "now " + ph[i][1] : ""}"><i>${i + 1}</i>${ph[i][0]}</div>` : `<div class="ph empty"></div>`).join(""));
-  $("cap").textContent = caption(s, p); $("cap").style.color = s.paused ? C.gold : p <= 1 || !on ? "#ffb3ba" : p === 4 ? "#ffcf8a" : "#9fd0ff";
+  $("cap").textContent = caption(s, p); $("cap").style.color = s.paused && !(MODE === "step" && gate.stage) ? C.gold : p <= 1 || !on ? "#ffb3ba" : p === 4 ? "#ffcf8a" : "#9fd0ff";
   apiView(s); swarmView(s); activity(s); stats(s); banner(s);
 }
 
@@ -373,6 +386,8 @@ addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   if (k === "1") post("/api/round/off"); else if (k === "2") post("/api/round/on");
   else if (k === "p" || k === " ") { e.preventDefault(); post("/api/round/toggle"); }
+  else if (k === "n" || e.key === "ArrowRight") post("/api/round/resume");
+  else if (k === "a") { MODE = MODE === "step" ? "auto" : "step"; localStorage.setItem("swarmshield.mode", MODE); if (MODE === "auto") post("/api/round/resume"); }
   else if (k === "e") post("/api/round/stop"); else if (k === "x") post("/api/reset");
 });
 $("mockpill").hidden = !MOCK;

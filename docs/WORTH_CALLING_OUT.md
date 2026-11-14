@@ -57,6 +57,7 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 - **The trust graph is red's own state.** Agents report their trust scores to the hub; a real defender cannot see inside the attacker, only infer the split from requests stopping and diverging.
 - **Dollar figures on the dashboard are scaled ×10,000** so they read in thousands. The underlying per-step costs are toy numbers from `step_cost`; say "illustrative" on stage.
 - **The API view is drawn from gateway `request` events** (last 60). Each attacker's dot sits on the tile of its latest request; routes outside the known set are drawn on Home / API docs.
+- **Step mode is driven by the dashboard tab.** It posts the stage pauses itself; with two dashboards open in step mode, both pause the round. Requests already in flight finish, so a stage can move on by one step before the freeze.
 - **Pause freezes the swarm, shopper and round clock, not the gateway.** Key/alias rotation (`ROTATE_S`) keeps ticking during a pause; old copies still work for their owner, so nothing breaks.
 - **The dashboard's story phases are inferred** from detections, realities and lone agents; a round that never detects stays on step 1.
 - **The hub keeps everything in memory.** Restarting it loses the round; only `events.jsonl` survives for replay.
