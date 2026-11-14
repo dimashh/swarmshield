@@ -6,6 +6,7 @@ Local, sandboxed hackathon demo: toy target, scripted red agents and synthetic d
 
 | Doc | What |
 |---|---|
+| [CHANGELOG.md](CHANGELOG.md) | One line per commit; pull before you push |
 | [docs/PLAN.md](docs/PLAN.md) | Ownership, work split, timeline, demo script, prior art |
 | [docs/CONTRACTS.md](docs/CONTRACTS.md) | Interfaces everyone builds against (wins over PLAN §2) |
 | [docs/FLOWS.md](docs/FLOWS.md) | Flows as text diagrams |
