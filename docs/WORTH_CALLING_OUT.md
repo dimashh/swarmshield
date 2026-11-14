@@ -52,6 +52,14 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 - **Response rewriting adds latency and needs JSON.** Fine for a demo; in production it is a WAF/reverse-proxy feature with real performance cost.
 - **The hub is trusted and unauthenticated.** Anyone on localhost could post events or read the blue board.
 
+## Dashboard and hub
+
+- **The trust graph is red's own state.** Agents report their trust scores to the hub; a real defender cannot see inside the attacker, only infer the split from requests stopping and diverging.
+- **The map places dots by path pattern** from the gateway's `request` events (swarm `step` events as fallback). Routes outside the known kill chain are drawn at `/`; a real map would be built from the observed route table.
+- **The dashboard's story phases are inferred** from detections, realities and lone agents; a round that never detects stays on step 1.
+- **The hub keeps everything in memory.** Restarting it loses the round; only `events.jsonl` survives for replay.
+- **`fake_round` is a scripted replay for rehearsal,** not the real swarm; numbers on stage come from the live services.
+
 ## What is solid
 
 - Canaries are unique per session, per round, per window, so a reused value names both the leaker and the reuser.
