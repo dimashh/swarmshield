@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `hub`: step mode shows one stage at a time: while held on a stage, the dashboard hides what belongs to later stages (Wardens, rejected tips, lone agents), since stages 2-4 can land within a second (Senior)
 - 2026-11-14 `hub`: dashboard served with `Cache-Control: no-store`; shows "HUB IS OUTDATED · restart ./run_demo.sh" when the hub predates pause support (Senior)
 - 2026-11-14 `hub`: dashboard step mode (default): the round pauses as each stage begins, `N`/→ moves on; `A` toggles auto (no stage pauses), remembered per browser (Senior)
 - 2026-11-14 `hub`: Warden boxes only pop when spawned live, not on page refresh (Senior)
