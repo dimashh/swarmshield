@@ -43,7 +43,8 @@ body{background:#0b0f17;color:var(--text);font:17px/1.3 Inter,"Segoe UI",system-
 .hint{color:#59647a;margin-top:16px;font-size:17px}
 /* svg */
 .tile rect{transition:fill .25s,stroke .25s}.tile.hit rect{fill:#2a3550}
-.wbox{}.wbox.spawn{animation:pop 1s ease-out;transform-box:fill-box;transform-origin:center}
+.wbox{}.wbox.spawn > rect:first-child{animation:wglow 1.4s ease-out}
+@keyframes wglow{0%{stroke-width:10;stroke:#8cc8ff}100%{stroke-width:2}}
 @keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.05);opacity:1}100%{transform:scale(1)}}
 .mark{transition:transform .6s ease}
 .trail{animation:fade 1.3s ease-out forwards}@keyframes fade{from{opacity:.55}to{opacity:0}}
