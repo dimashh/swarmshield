@@ -124,6 +124,6 @@ async def orders(request: Request):
     except ValueError:
         body = None
     pid = body.get("product_id") if isinstance(body, dict) else None
-    if pid not in {p["id"] for p in PRODUCTS}:
+    if not any(p["id"] == pid for p in PRODUCTS):
         return JSONResponse({"error": "product not found"}, status_code=404)
     return {"order_id": next(_order_ids), "status": "created"}
