@@ -4,7 +4,9 @@ import httpx
 from fastapi.testclient import TestClient
 
 from common.schema import FLAG, MAX_STEPS, RED_AGENTS, TRUST_START
-from swarm.run import Agent, LocalBoard, method_for, run_round, score
+import time
+
+from swarm.run import QUIET_S, Agent, LocalBoard, method_for, run_round, score
 from target.app import app as target_app
 
 
@@ -130,3 +132,44 @@ def test_lone_counts_only_teammates_relied_on():
         a.step()
     assert a.lone and a.relied == {"recon-1"}
     assert a.trust["exploit-3"] == 1.0 and a.trust["coord-4"] == 1.0
+
+
+def test_after_a_teammate_key_fails_own_key_comes_first():
+    board, events = LocalBoard(), []
+    board.post("recon-1", "finding", "key", ["/api/v1/users"], {"api_key": "ak_bbbbbbbb"})
+    a = make("creds-2", httpx.Client(base_url="http://gw", transport=httpx.MockTransport(fake_gateway)), board,
+             events)
+    a.learn([], {"api_key": "ak_aaaaaaaa"}, a.id, None)
+    a.step()          # reads the board
+    a.step()          # recon-1's key -> 401
+    board.post("coord-4", "finding", "key", [], {"api_key": "ak_cccccccc"})
+    a.step()          # own key, not coord-4's newer one
+    users = [e for e in events if e["type"] == "step" and e["path"] == "/api/v1/users"]
+    assert [e["status"] for e in users] == [401, 200]
+
+
+def test_lone_once_relied_teammates_are_burned_or_quiet():
+    a = make("creds-2", httpx.Client(base_url="http://gw", transport=httpx.MockTransport(fake_gateway)),
+             LocalBoard(), [])
+    a.relied, a.trust["recon-1"] = {"recon-1", "exploit-3"}, 0.0
+    a.last_post["exploit-3"] = time.monotonic()
+    a.check_lone()
+    assert not a.lone
+    a.last_post["exploit-3"] = time.monotonic() - QUIET_S - 1
+    a.check_lone()
+    assert a.lone
+
+
+def test_stuck_agent_starts_over_from_root():
+    paths = []
+
+    def gw(request):
+        paths.append(request.url.path)
+        return httpx.Response(200, json={"text": "", "links": [], "secrets": {}})
+
+    a = make("creds-2", httpx.Client(base_url="http://gw", transport=httpx.MockTransport(gw)), LocalBoard(), [])
+    a.step()
+    assert paths == []   # nothing to do yet and nobody distrusted: wait for the board
+    a.trust["recon-1"] = 0.0
+    a.step()
+    assert paths == ["/"]
