@@ -52,3 +52,18 @@ def test_emitter_survives_hub_down(capsys):
 def test_helpers_return_none_when_hub_down():
     assert hub.get_round(base_url="http://127.0.0.1:1") is None
     assert hub.get_blue(base_url="http://127.0.0.1:1") == []
+
+
+def test_stop_round_flushes_queued_events_first(monkeypatch):
+    order = []
+
+    def handler(request):
+        order.append(request.url.path)
+        return httpx.Response(200, json={"ok": True})
+
+    em = hub.Emitter(base_url="http://hub", transport=httpx.MockTransport(handler), flush_s=3600)
+    monkeypatch.setattr(hub, "_default", em)
+    monkeypatch.setattr(hub, "_request", lambda method, path, **kw: order.append(path) or {"ok": True})
+    em.emit("flag_captured", 1, agent="recon-1")
+    hub.stop_round()
+    assert order == ["/api/events", "/api/round/stop"]

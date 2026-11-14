@@ -28,6 +28,9 @@ def get_round(base_url: str = None):
 
 
 def stop_round(base_url: str = None):
+    """Flushes queued events first, so e.g. `flag_captured` lands before the hub closes the round."""
+    if _default is not None:
+        _default.flush()
     return _request("POST", "/api/round/stop", base_url=base_url)
 
 
@@ -62,6 +65,7 @@ class Emitter:
         self._q = queue.Queue()
         self._flush_s = flush_s
         self._down = False
+        self._flush_lock = threading.Lock()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -71,6 +75,10 @@ class Emitter:
         return event
 
     def flush(self):
+        with self._flush_lock:   # a caller's flush also waits for a batch the daemon thread is still posting
+            self._flush()
+
+    def _flush(self):
         batch = []
         while True:
             try:
