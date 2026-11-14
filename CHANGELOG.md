@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `swarm`: only the first agent to land the flag emits `flag_captured` when two land it in the same instant (Graduate)
 - 2026-11-14 `swarm`: `lone` once every teammate the agent relied on (acted on their leads/secrets) is below `TRUST_IGNORE_BELOW`, not all three (3 lone by about 22s with Shield ON); CONTRACTS §5 and WORTH_CALLING_OUT updated (Graduate)
 - 2026-11-14 `swarm`: flag capture retries the hub round stop while the hub is unreachable (Graduate)
 - 2026-11-14 `swarm`: round loop is bounded by `MAX_STEPS` step slots (idle agents no longer hang `--local`); results arriving after a round ends are dropped and only the current round is stopped on a late flag (Graduate)

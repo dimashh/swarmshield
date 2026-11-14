@@ -15,6 +15,7 @@ from common import hub
 from common.schema import (GATEWAY_URL, H_ADMIN, H_AGENT, H_API_KEY, MAX_STEPS, POLL_ROUND_S, RED_AGENTS, STEP_JITTER,
                            STEP_S, TARGET_URL, TRUST_FAIL, TRUST_IGNORE_BELOW, TRUST_OK, TRUST_START, step_cost)
 
+FLAG_LOCK = threading.Lock()
 SCORES = {"flag": 50, "admin": 28, "login": 26, "backup": 22, "users": 15, "docs": 10}
 STAGE_OF = {"api_key": 1, "cfg": 2, "admin_pass": 3, "admin_token": 4}
 HEADER_OF = {"api_key": H_API_KEY, "admin_token": H_ADMIN}
@@ -211,6 +212,10 @@ class Agent:
                   lead_from=None if lead_from == self.id else lead_from, thought=thought,
                   **step_cost(self.board_len, page_text))
         if data.get("flag"):
+            with FLAG_LOCK:   # two agents can land the flag in the same instant; only the first wins
+                if self.stop.is_set():
+                    return True
+                self.stop.set()
             self.won = True
             self.emit("flag_captured", agent=self.id, flag=data["flag"])
             self.emit("commentary", kind="win", text=f"{self.id} captured the flag.")
