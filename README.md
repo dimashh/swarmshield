@@ -2,6 +2,8 @@
 
 Attacker swarms win because they share what they find. SwarmShield is a gateway with its own blue swarm: a **Sentinel** that spots attackers working as a team, and one **Warden** per caught attacker that serves it a private, consistent fake API. The more the red agents share, the more they contradict each other, until they stop trusting each other and fall apart. Real customers keep using the real API untouched.
 
+**Demo video:** [docs/media/swarmshield-demo.mp4](docs/media/swarmshield-demo.mp4) (66s, 1080p: Shield OFF round, Shield ON round, scorecard).
+
 > Local, sandboxed hackathon demo: a toy target, scripted red agents and synthetic secrets only. Nothing here attacks a real system. Known limits are listed in [docs/WORTH_CALLING_OUT.md](docs/WORTH_CALLING_OUT.md); read them before presenting.
 
 ## Quick start
