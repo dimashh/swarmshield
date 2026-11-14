@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `hub`: starting a round writes a `commentary` line to `events.jsonl`, so a hub restart before the round's first event doesn't reuse its id (Product)
 - 2026-11-14 `hub`: `Optional[int]` instead of `int | None` so the hub starts on macOS's stock Python 3.9 (suite and all apps verified on 3.9) (Senior)
 - 2026-11-14 `common`: `hub.stop_round()` flushes queued events first, so `flag_captured` reaches the hub before the round closes (Shield OFF rounds were recording `flag: false`) (Senior)
 - 2026-11-14 `hub`: a winner's `flag_captured` that lands just after its own `round/stop` now counts (live OFF rounds showed SAFE); round ids continue from `events.jsonl` after a hub restart; map trusts gateway `request` events over swarm `step`s, one catch label at a time, caption counts lone agents (Product)

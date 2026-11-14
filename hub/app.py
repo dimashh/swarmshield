@@ -249,7 +249,9 @@ def round_ctl(mode: str, round: Optional[int] = None):
         _stop()
         last_id += 1
         R = Round(last_id, shield=(mode == "on"), running=True)
-        _comment("info", f"Round {R.id} started. Shield {'ON' if R.shield else 'OFF'}.")
+        text = f"Round {R.id} started. Shield {'ON' if R.shield else 'OFF'}."
+        _comment("info", text)
+        _log({"type": "commentary", "round": R.id, "t": 0.0, "kind": "info", "text": text})  # so a restart before any event still skips this id
         return {"id": R.id, "shield": R.shield}
 
 

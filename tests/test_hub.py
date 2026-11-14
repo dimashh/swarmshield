@@ -33,3 +33,8 @@ def test_late_non_flag_events_do_not_change_result():
     c.post("/api/round/stop", params={"round": rid})
     c.post("/api/events", json={"type": "contradiction", "round": rid, "agent": "recon-1", "about": "creds-2"})
     assert c.get("/api/state").json()["results"][-1]["contradictions"] == 0
+
+
+def test_round_id_survives_restart_before_first_event():
+    rid = c.post("/api/round/on").json()["id"]
+    assert hub._last_logged_round() == rid
