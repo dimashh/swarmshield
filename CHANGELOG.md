@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `docs`: WORTH_CALLING_OUT integration rerun with latest swarm (4/4 lone, split 35.8s, detect 7.6s; shopper missing so legit 100% is 0/0) (Senior)
 - 2026-11-14 `shield`: fix double Warden assignment under concurrent requests; integration findings (detect 7.8s, no split yet) in WORTH_CALLING_OUT (Senior)
 - 2026-11-14 `shield`: detection is now the named **Sentinel** (`shield/detect.py` -> `shield/sentinel.py`); every alert is posted to the blue board as `warden:"Sentinel"` (`admin_path:null`) before the Wardens post, plus `Sentinel:` commentary (Senior)
 - 2026-11-14 `docs`: `docs/COMPETITOR_RESEARCH.md` §15 Split-Brain update (Sundew, DaxxSec/Labyrinth, multi-agent honeypots, *Offers, Not Rumours*, new positioning map); pitch prior-art table updated (Devin)
