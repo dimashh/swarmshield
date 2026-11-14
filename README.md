@@ -9,6 +9,7 @@ Local, sandboxed hackathon demo: toy target, scripted red agents and synthetic d
 | [docs/PLAN.md](docs/PLAN.md) | Ownership, work split, timeline, demo script, prior art |
 | [docs/CONTRACTS.md](docs/CONTRACTS.md) | Interfaces everyone builds against (wins over PLAN §2) |
 | [docs/FLOWS.md](docs/FLOWS.md) | Flows as text diagrams |
+| [docs/COMPETITOR_RESEARCH.md](docs/COMPETITOR_RESEARCH.md) | Competitor and prior-art research |
 | [docs/flows.html](docs/flows.html) | Flows as pictures (download and open in a browser) |
 | [common/schema.py](common/schema.py) | Shared constants and helpers (`python common/schema.py` self-checks) |
 | [hub/static/mock_state.json](hub/static/mock_state.json) | Example `/api/state` for building the dashboard |
