@@ -35,6 +35,15 @@ Known gaps and simplifications. Say these before someone else does. Each line: w
 - **Shopper not running yet:** `legit_ok`/`legit_fail` are 0/0 but the hub reports `legit_pct` 100. Don't quote "100% legit" until the shopper runs.
 - **Fixed:** two parallel requests from one newly flagged agent could build two Wardens for it (seen live for coord-4). Warden assignment is now serialised.
 
+## Red swarm (`swarm/run.py`, Graduate)
+
+- **The swarm is scripted, not an LLM.** Keyword scores pick the next lead and `tokens_in/out` and `cost` are simulated by `step_cost`. A real LLM swarm would reason about contradictions instead of applying fixed trust deltas.
+- **Agents trust teammates first.** They try the newest teammate secret before their own, which is what makes canaries travel. A swarm that prefers its own values would be linked later or only by the honey/`/admin`/404 rules.
+- **Trust collapse is slower than the plan's 20-30s.** Each agent needs 3 failures from *each* of 3 teammates (1.0 - 2x0.35 = 0.30 is not below 0.30), and one request blames at most one teammate, so at 1 step per ~3s the floor is about 27s after detection. In stand-in-hub runs: detect 6-10s, first `lone` at about 34s, 1 agent lone by 45s. With `TRUST_FAIL` -0.45 (local test only, not committed): 2 lone by about 31s, 3 by about 43s.
+- **No second-hand distrust.** An agent lowers trust only from its own failed requests, never from a teammate's `contradiction` post. Gossip would make the split faster but is not in the contract.
+- **Agents don't revisit pages.** After `ROTATE_S` they keep using the copies they already have (still valid for them), so rotation shows up only through newly visited pages.
+- **Detection time depends on the swarm's order.** The first canary replay happens when the second agent uses the first one's key (about 6-10s), above the plan's < 5s.
+
 ## Scope of the demo
 
 - **Synthetic, local sandbox only.** Fixed secrets and a fake flag on localhost. Nothing touches real systems.

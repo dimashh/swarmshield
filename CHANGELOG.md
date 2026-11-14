@@ -2,6 +2,7 @@
 
 One line per commit, newest first. Everyone commits to `main`: run `git pull --rebase origin main` before you start and before every push.
 
+- 2026-11-14 `swarm`: red swarm `swarm/run.py` (4 agents per hub round via `common/hub.py`, links/leads/secrets only, keyword scores, follows `/admin-xxxx` aliases and honey links as received, directed trust + `contradiction`/`lone`, `flag_captured` then round stop; `--local` runs against the target with no hub), `tests/test_swarm.py`, swarm gaps in `docs/WORTH_CALLING_OUT.md` (Graduate)
 - 2026-11-14 `docs`: WORTH_CALLING_OUT integration rerun with latest swarm (4/4 lone, split 35.8s, detect 7.6s; shopper missing so legit 100% is 0/0) (Senior)
 - 2026-11-14 `shield`: fix double Warden assignment under concurrent requests; integration findings (detect 7.8s, no split yet) in WORTH_CALLING_OUT (Senior)
 - 2026-11-14 `shield`: detection is now the named **Sentinel** (`shield/detect.py` -> `shield/sentinel.py`); every alert is posted to the blue board as `warden:"Sentinel"` (`admin_path:null`) before the Wardens post, plus `Sentinel:` commentary (Senior)
