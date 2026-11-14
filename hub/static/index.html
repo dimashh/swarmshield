@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SwarmShield Split-Brain</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0b0f17; --panel: #121826; --line: #1f2a3d; --text: #e6edf7; --muted: #7d8aa3;
+    --red: #ff4d5e; --orange: #ff9f1c; --blue: #3aa0ff; --green: #2ee59d; --gold: #ffd23f; --grey: #59647a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 18px/1.35 "Inter", "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+  .app { display: grid; height: 100vh; padding: 16px 20px; gap: 14px;
+    grid-template-rows: 60px 1fr 270px; grid-template-columns: 1fr 440px 420px; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; }
+  h1 { font-size: 30px; margin: 0; letter-spacing: .5px; }
+  h1 span { color: var(--red); }
+  .pill { padding: 6px 14px; border-radius: 999px; font-weight: 800; font-size: 18px; letter-spacing: 1px; }
+  .sim { background: #2a1f00; color: var(--gold); border: 2px solid var(--gold); }
+  .shield-on { background: #062a4d; color: var(--blue); border: 2px solid var(--blue); }
+  .shield-off { background: #3b0a12; color: var(--red); border: 2px solid var(--red); }
+  .mock { background: #222; color: var(--muted); border: 2px dashed var(--muted); }
+  .timer { font: 800 40px/1 ui-monospace, Menlo, monospace; margin-left: auto; }
+  .round { color: var(--muted); font-size: 20px; }
+  .keys { color: var(--muted); font-size: 15px; }
+  kbd { border: 1px solid var(--muted); border-radius: 4px; padding: 1px 7px; color: var(--text); font-weight: 700; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 0; }
+  .panel h2 { margin: 0 0 8px; font-size: 15px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
+  /* hero */
+  .hero { position: relative; display: flex; flex-direction: column; }
+  .hero svg { flex: 1; width: 100%; min-height: 0; }
+  .ticker { font-size: 22px; min-height: 30px; color: var(--text); }
+  .ticker .k-detect, .ticker .k-split, .ticker .k-win { color: var(--blue); }
+  .ticker .k-lone { color: var(--orange); } .ticker .k-loss { color: var(--red); }
+  .edge { fill: none; stroke-linecap: round; }
+  .node-label { font: 800 22px ui-monospace, Menlo, monospace; fill: var(--text); text-anchor: middle; }
+  .tag { font: 800 16px sans-serif; text-anchor: middle; letter-spacing: 2px; }
+  /* side */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
+  .metric { background: #0e1420; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+  .metric .v { font: 800 38px/1.1 ui-monospace, Menlo, monospace; }
+  .metric .l { color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .feeds { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 0; }
+  .feed { overflow: hidden; display: flex; flex-direction: column; }
+  .feed ul { list-style: none; margin: 0; padding: 0; overflow: hidden; display: flex; flex-direction: column-reverse; justify-content: flex-end; }
+  .feed li { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
+  .feed li b { font-family: ui-monospace, Menlo, monospace; }
+  .feed li.contra { color: var(--orange); }
+  .feed li .t { color: var(--muted); font-size: 13px; margin-right: 6px; font-family: ui-monospace, monospace; }
+  .blue li { color: #9fd0ff; }
+  /* agents */
+  .agents { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .agent { display: flex; flex-direction: column; gap: 8px; }
+  .agent .top { display: flex; align-items: center; justify-content: space-between; }
+  .agent .name { font: 800 24px ui-monospace, Menlo, monospace; }
+  .status { font-size: 14px; font-weight: 800; padding: 3px 10px; border-radius: 999px; letter-spacing: 1px; text-transform: uppercase; }
+  .s-active { background: #3b0a12; color: var(--red); } .s-flagged { background: #062a4d; color: var(--blue); }
+  .s-lone { background: #252b36; color: #b9c2d3; } .s-won { background: #3a2f00; color: var(--gold); }
+  .chain { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .seg { height: 18px; border-radius: 4px; background: #1b2333; font-size: 11px; color: var(--muted); text-align: center; line-height: 18px; }
+  .seg.real { background: var(--red); color: #fff; }
+  .seg.fake { background: repeating-linear-gradient(45deg, #1d5fa3, #1d5fa3 6px, #134070 6px, #134070 12px); color: #fff; }
+  .seg.won { background: var(--gold); color: #000; }
+  .thought { color: var(--muted); font-style: italic; font-size: 16px; height: 22px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .reality { border-top: 1px dashed var(--line); padding-top: 6px; font-size: 16px; }
+  .reality .lbl { color: var(--blue); font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+  .reality code { font: 700 19px ui-monospace, Menlo, monospace; color: #cfe6ff; }
+  .reality .row { display: flex; justify-content: space-between; gap: 8px; }
+  .reality .none { color: var(--muted); }
+  .cost { font-family: ui-monospace, monospace; color: var(--muted); font-size: 14px; }
+  /* banner */
+  .banner { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,8,14,.82); z-index: 10; }
+  .banner.show { display: flex; }
+  .banner .box { text-align: center; padding: 34px 50px; border-radius: 18px; background: var(--panel); border: 3px solid var(--blue); min-width: 1100px; }
+  .banner .box.loss { border-color: var(--red); }
+  .banner .big { font: 900 76px/1.1 sans-serif; letter-spacing: 2px; }
+  .banner .sub { font: 700 30px ui-monospace, Menlo, monospace; color: var(--muted); margin: 8px 0 24px; }
+  .score { width: 100%; border-collapse: collapse; font-size: 24px; }
+  .score th, .score td { padding: 8px 14px; border-bottom: 1px solid var(--line); text-align: center; }
+  .score th { color: var(--muted); font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
+  .score td:first-child { text-align: left; color: var(--muted); }
+  .bad { color: var(--red); font-weight: 800; } .good { color: var(--green); font-weight: 800; }
+  .hint { margin-top: 16px; color: var(--muted); font-size: 16px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Swarm<span>Shield</span> Split-Brain</h1>
+    <span class="pill sim">SIMULATION</span>
+    <span id="shield" class="pill shield-off">SHIELD OFF</span>
+    <span id="mockpill" class="pill mock" hidden>MOCK DATA</span>
+    <span class="round" id="round">Round 0</span>
+    <span class="keys"><kbd>1</kbd> Shield OFF &nbsp; <kbd>2</kbd> Shield ON &nbsp; <kbd>E</kbd> end &nbsp; <kbd>X</kbd> reset</span>
+    <span class="timer" id="timer">0.0s</span>
+  </header>
+
+  <section class="panel hero">
+    <h2>Red swarm trust graph</h2>
+    <div class="ticker" id="ticker"></div>
+    <svg id="graph" viewBox="0 0 1000 720" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/>
+        </marker>
+        <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <g id="edges"></g>
+      <g id="nodes"></g>
+    </svg>
+  </section>
+
+  <div class="feeds">
+    <div class="panel feed"><h2>Red board (what attackers share)</h2><ul id="board"></ul></div>
+    <div class="panel feed blue"><h2>Blue board (Wardens)</h2><ul id="blue"></ul></div>
+  </div>
+  <aside class="metrics" id="metrics"></aside>
+
+  <section class="agents" id="agents"></section>
+</div>
+
+<div class="banner" id="banner"><div class="box" id="bannerbox">
+  <div class="big" id="bannerbig"></div>
+  <div class="sub" id="bannersub"></div>
+  <table class="score" id="score"></table>
+  <div class="hint">Press <kbd>1</kbd> or <kbd>2</kbd> for a new round, <kbd>X</kbd> to reset</div>
+</div></div>
+
+<script>
+const AGENTS = ["recon-1", "creds-2", "exploit-3", "coord-4"];
+const MOCK = new URLSearchParams(location.search).has("mock");
+const POLL_MS = 300;
+const STAGES = ["recon", "foothold", "creds", "admin", "flag"];
+const C = { red: "#ff4d5e", orange: "#ff9f1c", blue: "#3aa0ff", gold: "#ffd23f", grey: "#59647a", text: "#e6edf7" };
+
+// diamond layout: recon top, creds right, exploit bottom, coord left
+const CX = 500, CY = 350, RX = 330, RY = 190, DRIFT = 1.25;
+const HOME = { "recon-1": [CX, CY - RY], "creds-2": [CX + RX, CY], "exploit-3": [CX, CY + RY], "coord-4": [CX - RX, CY] };
+const pos = {}; AGENTS.forEach(a => pos[a] = [...HOME[a]]);
+
+let S = null, seenBoard = 0, lastRound = -1, prevTrust = {};
+const flashUntil = {};   // "a>b" -> ms timestamp
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = (v, d = 1, u = "") => v === null || v === undefined ? "–" : Number(v).toFixed(d) + u;
+const usd = v => "$" + (v < 0.01 ? Number(v || 0).toFixed(4) : Number(v).toFixed(2));
+
+// ---- svg scaffolding ----
+const NS = "http://www.w3.org/2000/svg";
+const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+const edgeEls = {}, nodeEls = {};
+for (const a of AGENTS) for (const b of AGENTS) if (a !== b)
+  edgeEls[a + ">" + b] = mk("path", { class: "edge", "marker-end": "url(#arrow)" }, $("edges"));
+for (const a of AGENTS) {
+  const g = mk("g", {}, $("nodes"));
+  const halo = mk("circle", { r: 74, fill: "none", "stroke-width": 0 }, g);
+  const c = mk("circle", { r: 60, "stroke-width": 5 }, g);
+  const lbl = mk("text", { class: "node-label", y: 8 }, g); lbl.textContent = a;
+  const tag = mk("text", { class: "tag", y: 100 }, g);
+  const badge = mk("g", { transform: "translate(44,-44)" }, g);
+  mk("circle", { r: 20, fill: C.blue, stroke: "#0b0f17", "stroke-width": 4 }, badge);
+  const bt = mk("text", { y: 7, "text-anchor": "middle", fill: "#fff", "font-size": 20, "font-weight": 900 }, badge); bt.textContent = "W";
+  nodeEls[a] = { g, halo, c, tag, badge };
+}
+
+function edgePath(a, b) {
+  const [x1, y1] = pos[a], [x2, y2] = pos[b];
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+  const off = 26, R = 72;                      // offset so a>b and b>a don't overlap
+  const sx = x1 + ux * R - uy * off, sy = y1 + uy * R + ux * off;
+  const ex = x2 - ux * (R + 6) - uy * off, ey = y2 - uy * (R + 6) + ux * off;
+  const mx = (sx + ex) / 2 - uy * 30, my = (sy + ey) / 2 + ux * 30;
+  return `M${sx},${sy} Q${mx},${my} ${ex},${ey}`;
+}
+
+function drawGraph() {
+  const now = performance.now();
+  const agents = {}; (S?.agents || []).forEach(a => agents[a.id] = a);
+  for (const a of AGENTS) {
+    const st = agents[a]?.status || "active";
+    const [hx, hy] = HOME[a], tx = st === "lone" ? CX + (hx - CX) * DRIFT : hx, ty = st === "lone" ? CY + (hy - CY) * DRIFT : hy;
+    pos[a][0] += (tx - pos[a][0]) * 0.06; pos[a][1] += (ty - pos[a][1]) * 0.06;
+    const n = nodeEls[a], col = st === "won" ? C.gold : st === "lone" ? C.grey : C.red;
+    n.g.setAttribute("transform", `translate(${pos[a][0]},${pos[a][1]})`);
+    n.c.setAttribute("fill", st === "lone" ? "#1a1f29" : col + "33"); n.c.setAttribute("stroke", col);
+    n.halo.setAttribute("stroke", col); n.halo.setAttribute("stroke-width", st === "won" ? 8 : 0);
+    n.g.setAttribute("filter", st === "won" ? "url(#glow)" : "");
+    n.tag.textContent = st === "lone" ? "LONE" : st === "won" ? "FLAG" : "";
+    n.tag.setAttribute("fill", st === "won" ? C.gold : "#b9c2d3");
+    n.badge.style.display = agents[a]?.reality || st === "flagged" ? "" : "none";
+  }
+  const trust = {}; (S?.trust || []).forEach(t => trust[t.a + ">" + t.b] = t.value);
+  for (const k in edgeEls) {
+    const [a, b] = k.split(">"), v = trust[k] ?? 1, el = edgeEls[k];
+    const flashing = (flashUntil[k] || 0) > now;
+    const loneSrc = agents[a]?.status === "lone";
+    el.setAttribute("d", edgePath(a, b));
+    el.setAttribute("stroke", flashing ? C.orange : loneSrc ? C.grey : agents[a]?.status === "won" ? C.gold : C.text);
+    el.setAttribute("stroke-width", flashing ? 4 + 12 * Math.max(v, .4) : 1.5 + 13 * v);
+    el.setAttribute("stroke-opacity", flashing ? 1 : 0.08 + 0.85 * v);
+    el.setAttribute("stroke-dasharray", v < (S?.trust_ignore_below ?? 0.3) ? "6 10" : "");
+  }
+  requestAnimationFrame(drawGraph);
+}
+
+// ---- panels ----
+function metricCards(m, s) {
+  const legitTotal = m.legit_ok + m.legit_fail;
+  const legitPct = s.legit_pct ?? (legitTotal ? Math.round(100 * m.legit_ok / legitTotal) : 100);
+  const cards = [
+    ["Contradictions", m.contradictions, m.contradictions ? C.orange : ""],
+    ["Avg trust", fmt(m.avg_trust, 2), m.avg_trust < 0.3 ? C.blue : m.avg_trust > 0.8 ? C.red : ""],
+    ["Lone agents", `${m.lone_agents}/4`, m.lone_agents >= 3 ? C.blue : ""],
+    ["Time to detect", fmt(m.time_to_detect, 1, "s"), m.time_to_detect !== null ? C.blue : ""],
+    ["Time to split", fmt(m.time_to_split, 1, "s"), m.time_to_split !== null ? C.blue : ""],
+    ["Attacker success", (m.attacker_success ? 100 : 0) + "%", m.attacker_success ? C.red : "#2ee59d"],
+    ["Legit success", legitPct + "%", legitPct === 100 ? "#2ee59d" : C.red],
+    ["Attacker $ vs defender $", `${usd(m.attacker_cost)}<span style="color:#7d8aa3;font-size:22px"> vs </span>${usd(m.defender_cost)}`, ""],
+  ];
+  $("metrics").innerHTML = cards.map(([l, v, c]) =>
+    `<div class="metric"${l.includes("$") ? ' style="grid-column:1/-1"' : ""}><div class="v" style="color:${c || "inherit"}">${v}</div><div class="l">${l}</div></div>`).join("");
+}
+
+function agentCards(s) {
+  $("agents").innerHTML = s.agents.map(a => {
+    const real = a.stage_real ?? (a.stage_fake ? 0 : a.stage);
+    const segs = STAGES.map((n, i) => {
+      const k = i + 1, cls = a.status === "won" && k <= a.stage ? "won" : k <= real ? "real" : k <= a.stage ? "fake" : "";
+      return `<div class="seg ${cls}">${n}</div>`;
+    }).join("");
+    const r = a.reality;
+    const reality = r ? `<div class="lbl">What its Warden told it</div>
+        <div class="row"><span>admin</span><code>${esc(r.admin_path)}</code></div>
+        <div class="row"><span>api key</span><code>${esc(r.api_key)}</code></div>
+        <div class="row"><span>flag hint</span><code>${esc(r.flag_hint)}</code></div>`
+      : `<div class="lbl" style="color:#7d8aa3">Reality</div><div class="none">Seeing the real target</div>`;
+    return `<div class="panel agent">
+      <div class="top"><span class="name">${esc(a.id)}</span><span class="status s-${a.status}">${a.status}</span></div>
+      <div class="chain">${segs}</div>
+      <div class="thought">${esc(a.thought) || "&nbsp;"}</div>
+      <div class="reality">${reality}</div>
+      <div class="cost">${a.steps ?? 0} steps · ${usd(a.cost)}</div></div>`;
+  }).join("");
+}
+
+function feeds(s) {
+  $("board").innerHTML = s.board.slice().map(p =>
+    `<li class="${p.kind === "contradiction" ? "contra" : ""}"><span class="t">${fmt(p.t)}s</span><b>${esc(p.author)}</b>: ${esc(p.text)}</li>`).join("");
+  $("blue").innerHTML = s.blue.slice().map(p =>
+    `<li><span class="t">${fmt(p.t)}s</span><b>${esc(p.warden)}</b>: ${esc(p.text)}</li>`).join("");
+  const c = s.commentary[s.commentary.length - 1];
+  $("ticker").innerHTML = c ? `<span class="k-${esc(c.kind)}">${esc(c.text)}</span>` : "";
+}
+
+function flashContradictions(s) {
+  if (s.round !== lastRound) { lastRound = s.round; seenBoard = 0; prevTrust = {}; }
+  const byId = {}; s.board.forEach(p => byId[p.id] = p);
+  for (const p of s.board) {
+    if (p.id <= seenBoard) continue;
+    if (p.kind === "contradiction") {
+      const about = byId[p.contradicts]?.author || (p.text.match(/^(recon-1|creds-2|exploit-3|coord-4)/) || [])[1];
+      if (about && about !== p.author) flashUntil[p.author + ">" + about] = performance.now() + 1500;
+    }
+    seenBoard = Math.max(seenBoard, p.id);
+  }
+  for (const t of s.trust) {
+    const k = t.a + ">" + t.b;
+    if (prevTrust[k] !== undefined && t.value < prevTrust[k] - 1e-6) flashUntil[k] = performance.now() + 1500;
+    prevTrust[k] = t.value;
+  }
+}
+
+function banner(s) {
+  const m = s.metrics, show = s.ended;
+  $("banner").classList.toggle("show", !!show);
+  if (!show) return;
+  const legitPct = s.legit_pct ?? 100;
+  const loss = !!s.captured_by;
+  $("bannerbox").className = "box" + (loss ? " loss" : "");
+  $("bannerbig").innerHTML = loss ? `<span style="color:${C.red}">FLAG STOLEN</span> ${fmt(m.time_to_flag ?? s.t, 0)}s`
+    : m.time_to_split !== null ? `<span style="color:${C.blue}">SWARM SPLIT</span> ${fmt(m.time_to_split, 0)}s`
+    : `<span style="color:#2ee59d">FLAG SAFE</span>`;
+  $("bannersub").textContent = `trust ${fmt(m.avg_trust, 2)} · ${m.contradictions} contradictions · legit ${legitPct}%`;
+  const rs = s.results.slice(-4);
+  if (!rs.length) { $("score").innerHTML = ""; return; }
+  const row = (label, f) => `<tr><td>${label}</td>${rs.map(f).join("")}</tr>`;
+  $("score").innerHTML =
+    `<tr><th></th>${rs.map(r => `<th>Round ${r.round} · Shield ${r.shield ? "ON" : "OFF"}</th>`).join("")}</tr>` +
+    row("Flag", r => `<td class="${r.flag ? "bad" : "good"}">${r.flag ? "STOLEN " + fmt(r.time_to_flag, 0) + "s" : "SAFE"}</td>`) +
+    row("Avg trust", r => `<td>${fmt(r.avg_trust, 2)}</td>`) +
+    row("Contradictions", r => `<td>${r.contradictions ?? "–"}</td>`) +
+    row("Time to split", r => `<td>${fmt(r.time_to_split, 1, "s")}</td>`) +
+    row("Legit success", r => `<td class="${r.legit_pct === 100 ? "good" : "bad"}">${r.legit_pct}%</td>`) +
+    row("Attacker $ / defender $", r => `<td>${usd(r.attacker_cost)} / ${usd(r.defender_cost)}</td>`);
+}
+
+function render(s) {
+  S = s;
+  $("shield").className = "pill " + (s.shield ? "shield-on" : "shield-off");
+  $("shield").textContent = "SHIELD " + (s.shield ? "ON" : "OFF");
+  $("round").textContent = `Round ${s.round}` + (s.running ? "" : s.round ? " · ended" : " · press 1 or 2");
+  $("timer").textContent = fmt(s.t) + "s";
+  flashContradictions(s);
+  metricCards(s.metrics, s);
+  agentCards(s);
+  feeds(s);
+  banner(s);
+}
+
+async function poll() {
+  try {
+    const r = await fetch(MOCK ? "/static/mock_state.json" : "/api/state", { cache: "no-store" });
+    if (r.ok) render(await r.json());
+  } catch (e) { /* hub restarting; keep last frame */ }
+  setTimeout(poll, POLL_MS);
+}
+
+const post = p => MOCK ? null : fetch(p, { method: "POST" }).catch(() => {});
+addEventListener("keydown", e => {
+  if (e.repeat || e.ctrlKey || e.metaKey) return;
+  const k = e.key.toLowerCase();
+  if (k === "1") post("/api/round/off");
+  else if (k === "2") post("/api/round/on");
+  else if (k === "e") post("/api/round/stop");
+  else if (k === "x") post("/api/reset");
+});
+
+$("mockpill").hidden = !MOCK;
+poll();
+requestAnimationFrame(drawGraph);
+</script>
+</body>
+</html>

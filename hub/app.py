@@ -1,0 +1,286 @@
+"""SwarmShield hub: rounds, red/blue boards, events and the derived /api/state (CONTRACTS §8-10)."""
+import json
+import threading
+import time
+from pathlib import Path
+
+from fastapi import Body, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from common.schema import RED_AGENTS, TRUST_IGNORE_BELOW, TRUST_START
+
+STATIC = Path(__file__).parent / "static"
+EVENTS_LOG = Path(__file__).resolve().parent.parent / "events.jsonl"
+BOARD_KEEP, BLUE_KEEP, COMMENTARY_KEEP = 14, 10, 4
+SPLIT_AT_LONE = 3
+
+app = FastAPI(title="SwarmShield hub")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+lock = threading.Lock()
+
+
+class Round:
+    def __init__(self, rid=0, shield=False, running=False):
+        self.id, self.shield, self.running = rid, shield, running
+        self.started_at = time.time()
+        self.stopped_at = None
+        self.board, self.blue, self.commentary = [], [], []
+        self.agents = {a: {"id": a, "stage": 0, "stage_real": 0, "stage_fake": False, "status": "active",
+                           "cost": 0.0, "steps": 0, "thought": "", "reality": None,
+                           "flagged": False, "lone": False, "won": False} for a in RED_AGENTS}
+        self.trust = {(a, b): TRUST_START for a in RED_AGENTS for b in RED_AGENTS if a != b}
+        self.links = []
+        self.contradictions = 0
+        self.flagged = set()
+        self.time_to_detect = None
+        self.time_to_split = None
+        self.time_to_flag = None
+        self.captured_by = None
+        self.defender_cost = 0.0
+        self.real_hits_after_detect = 0
+        self.legit_ok = self.legit_fail = 0
+        self.lone_order = []
+
+    def t(self):
+        end = self.stopped_at or time.time()
+        return round(end - self.started_at, 1) if self.id else 0.0
+
+
+R = Round()
+results: list = []
+
+
+def _log(ev):
+    try:
+        with EVENTS_LOG.open("a") as f:
+            f.write(json.dumps(ev) + "\n")
+    except OSError:
+        pass
+
+
+def _comment(kind, text):
+    R.commentary.append({"t": R.t(), "kind": kind, "text": text})
+
+
+def _agent(aid):
+    return R.agents[aid]
+
+
+def _avg_trust():
+    return round(sum(R.trust.values()) / len(R.trust), 2) if R.trust else 0.0
+
+
+def _apply(ev):
+    typ = ev.get("type")
+    if typ == "step" and ev.get("agent") in R.agents:
+        ag = _agent(ev["agent"])
+        ag["steps"] += 1
+        ag["cost"] = round(ag["cost"] + float(ev.get("cost") or 0), 6)
+        if ev.get("thought"):
+            ag["thought"] = ev["thought"]
+        stage = int(ev.get("stage") or 0)
+        ag["stage"] = max(ag["stage"], stage)
+        if not ag["flagged"]:
+            ag["stage_real"] = ag["stage"]
+    elif typ == "trust":
+        key = (ev.get("a"), ev.get("b"))
+        if key in R.trust:
+            R.trust[key] = max(0.0, min(1.0, float(ev.get("value", 0))))
+    elif typ == "contradiction":
+        R.contradictions += 1
+    elif typ == "lone" and ev.get("agent") in R.agents:
+        ag = _agent(ev["agent"])
+        if not ag["lone"]:
+            ag["lone"] = True
+            R.lone_order.append(ag["id"])
+            n = len(R.lone_order)
+            _comment("lone", f"{ag['id']} no longer trusts anyone. {n} agent{'s' if n > 1 else ''} lone.")
+            if n == SPLIT_AT_LONE and R.time_to_split is None:
+                R.time_to_split = R.t()
+                _comment("split", f"Swarm split after {R.time_to_split}s. Shared knowledge is now poison.")
+    elif typ == "flag_captured":
+        aid = ev.get("agent")
+        if aid in R.agents:
+            _agent(aid)["won"] = True
+            _agent(aid)["stage"] = _agent(aid)["stage_real"] = 5
+        if R.captured_by is None:
+            R.captured_by = aid
+            R.time_to_flag = R.t()
+            _comment("loss", f"{aid} captured the flag after {R.time_to_flag}s.")
+    elif typ == "legit":
+        if int(ev.get("status") or 0) < 400:
+            R.legit_ok += 1
+        else:
+            R.legit_fail += 1
+    elif typ == "request":
+        if ev.get("routed") == "real" and ev.get("session") in R.flagged:
+            R.real_hits_after_detect += 1
+    elif typ == "canary_link":
+        link = {"a": ev.get("a"), "b": ev.get("b"), "token": ev.get("token")}
+        if not any(l["a"] == link["a"] and l["b"] == link["b"] for l in R.links):
+            R.links.append(link)
+    elif typ == "detected":
+        if R.time_to_detect is None:
+            R.time_to_detect = R.t()
+        for s in ev.get("sessions") or []:
+            R.flagged.add(s)
+            if s in R.agents:
+                _agent(s)["flagged"] = True
+    elif typ == "reality_assigned" and ev.get("session") in R.agents:
+        f = ev.get("facts") or {}
+        ag = _agent(ev["session"])
+        ag["flagged"] = True
+        R.flagged.add(ev["session"])
+        ag["reality"] = {"admin_path": f.get("admin_path"), "api_key": f.get("api_key"),
+                         "flag_hint": f.get("flag_hint"), "warden": ev.get("warden")}
+    elif typ == "defender_cost":
+        R.defender_cost = float(ev.get("usd") or 0)
+    elif typ == "commentary":
+        _comment(ev.get("kind", "info"), ev.get("text", ""))
+
+
+def _metrics():
+    return {"contradictions": R.contradictions, "avg_trust": _avg_trust(), "lone_agents": len(R.lone_order),
+            "time_to_detect": R.time_to_detect, "time_to_split": R.time_to_split,
+            "time_to_flag": R.time_to_flag,
+            "attacker_cost": round(sum(a["cost"] for a in R.agents.values()), 4),
+            "defender_cost": round(R.defender_cost, 6), "real_hits_after_detect": R.real_hits_after_detect,
+            "attacker_success": 1 if R.captured_by else 0, "legit_ok": R.legit_ok, "legit_fail": R.legit_fail}
+
+
+def _legit_pct():
+    total = R.legit_ok + R.legit_fail
+    return round(100 * R.legit_ok / total) if total else 100
+
+
+def _status(ag):
+    if ag["won"]:
+        return "won"
+    if ag["lone"]:
+        return "lone"
+    if ag["flagged"]:
+        return "flagged"
+    return "active"
+
+
+def _stop():
+    if not R.running:
+        return
+    R.running = False
+    R.stopped_at = time.time()
+    m = _metrics()
+    if R.shield and not R.captured_by:
+        _comment("win", f"Round over. Flag safe, trust {m['avg_trust']}, legit {_legit_pct()}%.")
+    results.append({"round": R.id, "shield": R.shield, "flag": bool(R.captured_by),
+                    "time_to_flag": R.time_to_flag, "time_to_split": R.time_to_split,
+                    "time_to_detect": R.time_to_detect, "avg_trust": m["avg_trust"],
+                    "contradictions": R.contradictions, "lone_agents": m["lone_agents"],
+                    "legit_pct": _legit_pct(), "attacker_cost": m["attacker_cost"],
+                    "defender_cost": m["defender_cost"]})
+
+
+# ---- rounds ----------------------------------------------------------------
+@app.post("/api/round/{mode}")
+def round_ctl(mode: str):
+    global R
+    with lock:
+        if mode == "stop":
+            _stop()
+            return {"ok": True}
+        if mode not in ("on", "off"):
+            return {"ok": False, "error": "mode must be on, off or stop"}
+        _stop()
+        R = Round(R.id + 1, shield=(mode == "on"), running=True)
+        _comment("info", f"Round {R.id} started. Shield {'ON' if R.shield else 'OFF'}.")
+        return {"id": R.id, "shield": R.shield}
+
+
+@app.get("/api/round")
+def round_get():
+    return {"id": R.id, "shield": R.shield, "running": R.running, "t": R.t()}
+
+
+@app.post("/api/reset")
+def reset():
+    """Hotkey X: clear everything, including the scorecard."""
+    global R
+    with lock:
+        R = Round()
+        results.clear()
+    return {"ok": True}
+
+
+# ---- boards ----------------------------------------------------------------
+@app.post("/api/board")
+def board_post(post: dict = Body(...)):
+    with lock:
+        p = {"author": post.get("author"), "kind": post.get("kind", "finding"), "text": post.get("text", ""),
+             "leads": post.get("leads") or [], "secrets": post.get("secrets") or {},
+             "contradicts": post.get("contradicts")}
+        p.update(id=len(R.board) + 1, t=R.t())
+        R.board.append(p)
+        return p
+
+
+@app.get("/api/board")
+def board_get(since: int = 0):
+    return [p for p in R.board if p["id"] > since]
+
+
+@app.post("/api/blue")
+def blue_post(post: dict = Body(...)):
+    with lock:
+        p = dict(post)
+        p.update(id=len(R.blue) + 1, t=R.t())
+        R.blue.append(p)
+        return p
+
+
+@app.get("/api/blue")
+def blue_get():
+    return R.blue
+
+
+# ---- events ----------------------------------------------------------------
+@app.post("/api/events")
+def events(body=Body(...)):
+    evs = body if isinstance(body, list) else [body]
+    with lock:
+        for ev in evs:
+            if not isinstance(ev, dict):
+                continue
+            if "round" in ev and ev["round"] != R.id:
+                continue
+            ev["t"] = R.t()
+            _log(ev)
+            _apply(ev)
+    return {"ok": True}
+
+
+# ---- state -----------------------------------------------------------------
+@app.get("/api/state")
+def state():
+    with lock:
+        agents = []
+        for ag in R.agents.values():
+            agents.append({"id": ag["id"], "stage": ag["stage"], "stage_real": ag["stage_real"],
+                           "stage_fake": ag["flagged"], "status": _status(ag), "cost": round(ag["cost"], 4),
+                           "steps": ag["steps"], "thought": ag["thought"], "reality": ag["reality"]})
+        return {"round": R.id, "shield": R.shield, "running": R.running, "t": R.t(),
+                "ended": R.id > 0 and not R.running, "captured_by": R.captured_by,
+                "agents": agents,
+                "trust": [{"a": a, "b": b, "value": round(v, 2)} for (a, b), v in R.trust.items()],
+                "trust_ignore_below": TRUST_IGNORE_BELOW,
+                "links": R.links,
+                "board": R.board[-BOARD_KEEP:], "blue": R.blue[-BLUE_KEEP:],
+                "commentary": R.commentary[-COMMENTARY_KEEP:],
+                "metrics": _metrics(), "legit_pct": _legit_pct(), "results": results}
+
+
+@app.get("/")
+def index():
+    return FileResponse(STATIC / "index.html")
