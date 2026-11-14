@@ -1,8 +1,10 @@
+import threading
+
 import httpx
 from fastapi.testclient import TestClient
 
 from common.schema import FLAG, MAX_STEPS, RED_AGENTS, TRUST_START
-from swarm.run import Agent, LocalBoard, method_for, score
+from swarm.run import Agent, LocalBoard, method_for, run_round, score
 from target.app import app as target_app
 
 
@@ -86,3 +88,23 @@ def test_aliases_and_honey_links_are_followed_as_received():
     paths = [e["path"] for e in events if e["type"] == "step"]
     assert paths == ["/", "/api/docs", "/internal/debug-a1b2c3"]
     assert not any("/admin" in p for p in paths)
+
+
+def test_round_ends_when_no_agent_can_act():
+    dead = httpx.MockTransport(lambda r: httpx.Response(404, json={"error": "not found"}))
+    agents = run_round(1, "http://gw", LocalBoard(), lambda *a, **k: None, threading.Event(), pace=False,
+                       transport=dead)
+    assert not any(a.won for a in agents)
+
+
+def test_results_after_round_end_are_dropped():
+    board, events, stop = LocalBoard(), [], threading.Event()
+
+    def gw(request):
+        stop.set()     # the round ends while this request is in flight
+        return httpx.Response(200, json={"links": ["/api/docs"], "secrets": {"api_key": "ak_aaaaaaaa"}})
+
+    a = Agent("recon-1", 1, httpx.Client(base_url="http://gw", transport=httpx.MockTransport(gw)), board,
+              lambda t, r, **f: events.append(t), starts=True, stop=stop)
+    a.step()
+    assert board.since(0) == [] and events == []

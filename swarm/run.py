@@ -58,8 +58,10 @@ class HubBoard:
 class Agent:
     """One red agent. step() makes at most one request."""
 
-    def __init__(self, agent_id: str, round_id: int, http: httpx.Client, board, emit, starts: bool = False):
+    def __init__(self, agent_id: str, round_id: int, http: httpx.Client, board, emit, starts: bool = False,
+                 stop: threading.Event = None):
         self.id, self.round, self.http, self.board, self._emit = agent_id, round_id, http, board, emit
+        self.stop = stop or threading.Event()   # set when the round ends; late results are dropped
         self.trust = {b: TRUST_START for b in RED_AGENTS if b != agent_id}
         self.leads = {"/": (agent_id, None)} if starts else {}   # path -> (from, post_id), insertion ordered
         self.secrets = {}                                        # kind -> [[value, from, post_id, alive]]
@@ -149,7 +151,8 @@ class Agent:
         if self.won or self.steps >= MAX_STEPS:
             return False
         acted = self.act()
-        self.read_board()
+        if not self.stop.is_set():
+            self.read_board()
         return acted
 
     def act(self) -> bool:
@@ -176,6 +179,8 @@ class Agent:
                 data = {}
         except httpx.HTTPError as e:
             print(f"[swarm] {self.id} {method} {path} failed: {e!r}")
+            return False
+        if self.stop.is_set():
             return False
         self.steps += 1
         data = data if isinstance(data, dict) else {}
@@ -238,10 +243,12 @@ def run_round(round_id: int, url: str, board, emit, stop: threading.Event, on_fl
               transport: httpx.BaseTransport = None) -> list:
     """Run all agents until the flag falls, every agent is out of steps, or stop is set."""
     agents = [Agent(a, round_id, httpx.Client(base_url=url, timeout=5.0, transport=transport), board, emit,
-                    starts=(i == 0)) for i, a in enumerate(RED_AGENTS)]
+                    starts=(i == 0), stop=stop) for i, a in enumerate(RED_AGENTS)]
 
     def loop(agent: Agent, rng: random.Random):
-        while not stop.is_set() and agent.steps < MAX_STEPS:
+        for _ in range(MAX_STEPS):
+            if stop.is_set():
+                return
             agent.step()
             if agent.won:
                 stop.set()
@@ -272,6 +279,12 @@ def run_local(url: str):
         print(f"{a.id}: stage {a.stage}, steps {a.steps}, won {a.won}, lone {a.lone}, trust {a.trust}")
 
 
+def stop_if_current(agent: Agent):
+    """Stop the hub round only if it is still the winner's round."""
+    if (hub.get_round() or {}).get("id") == agent.round:
+        hub.stop_round()
+
+
 def run_with_hub(url: str):
     current = {"id": None, "stop": threading.Event()}
     while True:
@@ -282,7 +295,7 @@ def run_with_hub(url: str):
             print(f"[swarm] round {r['id']} (shield {'ON' if r.get('shield') else 'OFF'}): spawning {RED_AGENTS}")
             threading.Thread(target=run_round, daemon=True,
                              args=(r["id"], url, HubBoard(), hub.emit, current["stop"]),
-                             kwargs={"on_flag": lambda a: hub.stop_round()}).start()
+                             kwargs={"on_flag": stop_if_current}).start()
         elif r and not r.get("running"):
             current["stop"].set()
         time.sleep(POLL_ROUND_S)
